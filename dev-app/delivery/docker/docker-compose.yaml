@@ -1,0 +1,10 @@
+name: parallel-server
+services:
+  parallel_db:
+    image: postgres
+    env_file:
+      - parallel-server.env
+    volumes:
+      - ./database/parallel:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
