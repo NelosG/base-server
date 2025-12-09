@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>nelos.parallel</groupId>
+        <artifactId>parallel-server-all</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <name>Parallel Dev App</name>
+    <artifactId>dev-app</artifactId>
+
+    <dependencies>
+        <!-- Parallel Server -->
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-core-commons</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-data</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-auth</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+
+        <!-- SPRING -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <version>${spring.boot.version}</version>
+        </dependency>
+
+        <!-- DB -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgresql.version}</version>
+        </dependency>
+    </dependencies>
+</project>
