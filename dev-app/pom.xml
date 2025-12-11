@@ -9,7 +9,7 @@
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
-    <name>Parallel Dev App</name>
+    <name>Parallel Server Dev App</name>
     <artifactId>dev-app</artifactId>
 
     <dependencies>
@@ -21,12 +21,12 @@
         </dependency>
         <dependency>
             <groupId>nelos.parallel</groupId>
-            <artifactId>parallel-server-data</artifactId>
+            <artifactId>parallel-server-auth-data</artifactId>
             <version>${parallel-server.version}</version>
         </dependency>
         <dependency>
             <groupId>nelos.parallel</groupId>
-            <artifactId>parallel-server-auth</artifactId>
+            <artifactId>parallel-server-auth-core</artifactId>
             <version>${parallel-server.version}</version>
         </dependency>
 

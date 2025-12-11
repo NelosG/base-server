@@ -9,7 +9,7 @@
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
-    <name>Parallel Core Commons</name>
+    <name>Parallel Server Core Commons</name>
     <artifactId>parallel-server-core-commons</artifactId>
     <packaging>jar</packaging>
 

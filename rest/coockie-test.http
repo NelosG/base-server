@@ -1,0 +1,32 @@
+###signup admin
+POST http://localhost:8080/auth/signup
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "123456",
+  "type": "ADMIN"
+}
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 201 || response.status === 400, "Response status is not 201 or 400");
+    });
+%}
+
+###signin admin
+POST http://localhost:8080/auth/signin
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "123456"
+}
+
+###post books admin
+POST http://localhost:8080/api/v1/books
+Content-Type: application/json
+
+{
+  "bla": "bla"
+}
