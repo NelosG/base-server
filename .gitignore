@@ -5,6 +5,7 @@ target/
 .kotlin
 delivery/
 *.log
+*.gz
 
 ### IntelliJ IDEA ###
 .idea/*

@@ -1,0 +1,142 @@
+###signup  not_admin
+POST http://localhost:8080/auth/signup
+Content-Type: application/json
+
+{
+  "login": "not_admin",
+  "password": "123456",
+  "type": "USER"
+}
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 201 || response.status === 400, "Response status is not 201 or 400");
+    });
+%}
+
+###signup admin
+POST http://localhost:8080/auth/signup
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "123456",
+  "type": "ADMIN"
+}
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 201 || response.status === 400, "Response status is not 201 or 400");
+    });
+%}
+
+<> 2025-09-28T215439.200.json
+
+###signin not_admin
+POST http://localhost:8080/auth/signin
+Content-Type: application/json
+
+{
+  "login": "not_admin",
+  "password": "123456"
+}
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###get books not_admin
+GET http://localhost:8080/api/v1/books
+Accept: application/json
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.length === 3, "Body length is not 3");
+    });
+%}
+
+###post books not_admin
+POST http://localhost:8080/api/v1/books
+Content-Type: application/json
+
+{
+  "bla": "bla"
+}
+
+> {%
+    client.test("Access denied", function () {
+        client.assert(response.status === 403, "Response status is not 403");
+    });
+%}
+
+###signin admin
+POST http://localhost:8080/auth/signin
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "123456"
+}
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###get books admin
+GET http://localhost:8080/api/v1/books
+Accept: application/json
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.length === 3, "Body length is not 3");
+    });
+%}
+
+###post books admin
+POST http://localhost:8080/api/v1/books
+Content-Type: application/json
+
+{
+  "bla": "bla"
+}
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 200, "Response status is not 200");
+    });
+%}
+
+###signOut admin
+POST http://localhost:8080/auth/signOut
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "123456"
+}
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 204, "Response status is not 204");
+    });
+%}
+
+###signin wrong password
+POST http://localhost:8080/auth/signin
+Content-Type: application/json
+
+{
+  "login": "admin",
+  "password": "1"
+}
+
+> {%
+    client.test("Request executed successfully", function () {
+        client.assert(response.status === 401, "Response status is not 401");
+    });
+%}
