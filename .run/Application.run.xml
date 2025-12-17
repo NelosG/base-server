@@ -2,7 +2,7 @@
   <configuration default="false" name="Application" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
     <option name="FRAME_DEACTIVATION_UPDATE_POLICY" value="UpdateClassesAndResources" />
     <module name="dev-app" />
-    <option name="SPRING_BOOT_MAIN_CLASS" value="com.nelos.parallel.core.Application" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.nelos.parallel.commons.Application" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>

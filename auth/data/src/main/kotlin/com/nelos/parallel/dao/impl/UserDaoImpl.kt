@@ -1,6 +1,6 @@
 package com.nelos.parallel.dao.impl
 
-import com.nelos.parallel.core.dao.impl.GenericDaoImpl
+import com.nelos.parallel.commons.dao.impl.GenericDaoImpl
 import com.nelos.parallel.dao.UserDao
 import com.nelos.parallel.entity.User
 import org.springframework.stereotype.Repository

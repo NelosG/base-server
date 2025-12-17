@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark" lang="en" xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="UTF-8">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <title><span th:text="${status}"></span></title>
+        <!-- Подключаем Bootstrap для стилей -->
+        <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}"/>
+        <link rel="stylesheet" th:href="@{/css/main.css}"/>
+    </head>
+    <body>
+        <div class="container">
+            <div class="error-container text-center">
+                <!-- Отображаем код ошибки -->
+                <div class="error-code" th:text="${status}"></div>
+
+                <!-- Путь, на котором произошла ошибка -->
+                <p class="text-muted" th:if="${path}">
+                    Error on request: <code th:text="${path}"></code>
+                </p>
+
+                <!-- Сообщение об ошибке -->
+                <p class="lead mb-4" th:text="${errorMessage}"></p>
+
+
+                <!-- Кнопка "Назад" -->
+                <div class="back-button">
+                    <a class="btn btn-primary btn-lg me-3" th:href="@{${referer}}">Back</a>
+
+                </div>
+
+                <div class="mt-4">
+                    <a class="btn btn-link" th:href="@{/}">Main page</a>
+                </div>
+            </div>
+        </div>
+
+    </body>
+</html>

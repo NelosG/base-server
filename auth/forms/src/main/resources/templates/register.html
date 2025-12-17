@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark" lang="en" xmlns:th="http://www.thymeleaf.org">
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
+    <head>
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <title>Login</title>
+
+        <script th:src="@{/webjars/bootstrap/5.3.8/js/bootstrap.bundle.min.js}"></script>
+
+        <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}"/>
+        <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css}"/>
+        <link rel="stylesheet" th:href="@{/css/main.css}"/>
+    </head>
+    <body class="login-body">
+        <div class="container">
+            <div class="login-container">
+                <!-- Заголовок -->
+                <div class="login-header">
+                    <h2>Registration</h2>
+                </div>
+
+                <!-- Сообщения об ошибках/успехе -->
+                <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${errorMessage}">
+                    <span th:text="${errorMessage}"></span>
+                    <button class="btn-close" data-bs-dismiss="alert" type="button"></button>
+                </div>
+
+                <!-- Форма логина -->
+                <form method="POST" th:action="@{/register/sign-up}">
+                    <!-- Поле логина -->
+                    <div class="form-group">
+                        <label class="form-label">Login<input autofocus
+                                                              class="form-control"
+                                                              name="login"
+                                                              placeholder="Login"
+                                                              required
+                                                              type="text">
+                        </label>
+                    </div>
+
+                    <!-- Поле пароля -->
+                    <div class="form-group">
+                        <label class="form-label">Password<input class="form-control"
+                                                                 name="password"
+                                                                 placeholder="Password"
+                                                                 required
+                                                                 type="password">
+                        </label>
+                    </div>
+
+                    <!-- Кнопка отправки -->
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary btn-lg" type="submit">
+                            <i class="bi bi-box-arrow-in-right"></i> Sign Up
+                        </button>
+                    </div>
+                    <div class="mt-1 text-end">
+                        <a class="btn btn-link" th:href="@{/login}">Sing In</a>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </body>
+</html>

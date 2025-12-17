@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" data-bs-theme="dark">
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
+    <head>
+        <title>Settings</title>
+
+        <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}"/>
+        <link rel="stylesheet" th:href="@{/css/main.css}"/>
+    </head>
+    <body>
+
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container-fluid">
+                <div class="navbar-nav me-auto">
+                    <form th:action="@{/logout}" method="post" class="d-inline">
+                        <a class="btn btn-outline-light" href="/">Back to Home Page</a>
+                    </form>
+                </div>
+                <div class="navbar-nav ms-auto">
+                    <form th:action="@{/logout}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-outline-light">Logout</button>
+                    </form>
+                </div>
+            </div>
+        </nav>
+
+    </body>
+</html>

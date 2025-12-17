@@ -15,6 +15,7 @@
 
     <modules>
         <module>core-commons</module>
+        <module>forms</module>
     </modules>
 
     <dependencies>

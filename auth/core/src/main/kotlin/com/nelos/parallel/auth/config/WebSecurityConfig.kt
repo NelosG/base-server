@@ -79,12 +79,18 @@ class WebSecurityConfig @Autowired constructor(
                 logout.logoutUrl("/logout")
                     .logoutSuccessUrl("/login?logout=true")
                     .invalidateHttpSession(true)
-                    .deleteCookies("JSESSIONID", CookieJwtAuthenticationFilter.COOKIE_NAME)
+                    .deleteCookies(
+                        "JSESSIONID",
+                        CookieJwtAuthenticationFilter.COOKIE_NAME
+                    )
                     .permitAll()
             }
             .authorizeHttpRequests { authorize ->
                 authorize
-                    .requestMatchers("/endpoint", "/error", "/login", "/login/**").permitAll()
+                    .requestMatchers("/").permitAll()
+                    .requestMatchers("/login", "/login/**","/register", "/register/**").permitAll()
+                    .requestMatchers("/endpoint", "/error" ).permitAll()
+                    .requestMatchers("/webjars/**", "/css/**", "/js/**", "/images/**").permitAll()
                     .requestMatchers("/admin/**").hasRole(UserType.ADMIN.name)
                     .anyRequest().authenticated()
             }.exceptionHandling { exceptions ->
@@ -94,6 +100,7 @@ class WebSecurityConfig @Autowired constructor(
                         response.status = HttpStatus.UNAUTHORIZED.value()
                         response.contentType = MediaType.APPLICATION_JSON_VALUE
                         response.writer.write("""{"error": "Unauthorized", "message": "${authException.message}"}""")
+                        response.sendRedirect("/login?unauthorized=true")
                     }
                     .accessDeniedHandler { request, response, accessDeniedException ->
                         // Только для случаев, когда у пользователя нет прав

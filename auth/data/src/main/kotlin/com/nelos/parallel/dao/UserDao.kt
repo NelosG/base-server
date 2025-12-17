@@ -1,6 +1,6 @@
 package com.nelos.parallel.dao
 
-import com.nelos.parallel.core.dao.GenericDao
+import com.nelos.parallel.commons.dao.GenericDao
 import com.nelos.parallel.entity.User
 
 /**

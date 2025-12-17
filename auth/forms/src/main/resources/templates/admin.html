@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark" lang="en" xmlns:th="http://www.thymeleaf.org">
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
+    <head>
+        <title>Admin</title>
+
+        <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}"/>
+        <link rel="stylesheet" th:href="@{/css/main.css}"/>
+    </head>
+    <body>
+
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container-fluid">
+                <div class="navbar-nav me-auto">
+                    <form class="d-inline" method="post" th:action="@{/logout}">
+                        <a class="btn btn-outline-light" href="/">Back to Home Page</a>
+                    </form>
+                </div>
+                <div class="navbar-nav ms-auto">
+                    <form class="d-inline" method="post" th:action="@{/logout}">
+                        <button class="btn btn-outline-light" type="submit">Logout</button>
+                    </form>
+                </div>
+            </div>
+        </nav>
+
+        <div class="card form-control">
+            <div class="card-body">
+                <a class="btn btn-primary" th:href="@{/settings}">Settings</a>
+            </div>
+        </div>
+
+        <form class="form-control" method="POST" th:action="@{/admin/create-admin}" th:object="${data}">
+            <div class="form-group">
+                <label> Login
+                    <input autofocus="autofocus"
+                           class="form-control" name="login" placeholder="login"
+                           th:field="*{login}" type="text"></label>
+                <label>Password
+                    <input class="form-control"
+                           name="password" placeholder="Enter Password" th:field="*{password}"
+                           type="password"/></label>
+                <input class="btn btn-primary" type="submit" value="Create admin"/>
+            </div>
+        </form>
+    </body>
+</html>
