@@ -1,23 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
-       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:util="http://www.springframework.org/schema/util"
        xmlns:context="http://www.springframework.org/schema/context"
        xmlns:jdbc="http://www.springframework.org/schema/jdbc"
        xsi:schemaLocation="http://www.springframework.org/schema/beans
-        http://www.springframework.org/schema/beans/spring-beans.xsd
-         http://www.springframework.org/schema/util
-          https://www.springframework.org/schema/util/spring-util.xsd
-          http://www.springframework.org/schema/context
-          https://www.springframework.org/schema/context/spring-context.xsd
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/util
+       https://www.springframework.org/schema/util/spring-util.xsd
+       http://www.springframework.org/schema/context
+       https://www.springframework.org/schema/context/spring-context.xsd
 	   http://www.springframework.org/schema/jdbc
        http://www.springframework.org/schema/jdbc/spring-jdbc.xsd">
 
 
-<bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+    <bean id="dataSource" class="com.zaxxer.hikari.HikariDataSource" destroy-method="close">
         <property name="driverClassName" value="org.postgresql.Driver"/>
-        <property name="url" value="jdbc:postgresql://localhost:5432/parallel"/>
+        <property name="jdbcUrl" value="jdbc:postgresql://localhost:5432/parallel"/>
         <property name="username" value="nelos"/>
         <property name="password" value="nelos"/>
+
+        <!-- Настройки пула соединений -->
+        <property name="connectionTimeout" value="30000"/>
+        <property name="maximumPoolSize" value="10"/>
+        <property name="minimumIdle" value="5"/>
+        <property name="idleTimeout" value="600000"/>
+        <property name="maxLifetime" value="1800000"/>
+        <property name="connectionTestQuery" value="SELECT 1"/>
+
+        <!-- Оптимизация для PostgreSQL -->
+        <property name="dataSourceProperties">
+            <props>
+                <prop key="socketTimeout">30</prop>
+                <prop key="tcpKeepAlive">true</prop>
+                <prop key="preparedStatementCacheQueries">256</prop>
+                <prop key="preparedStatementCacheSizeMiB">5</prop>
+            </props>
+        </property>
     </bean>
 
     <jdbc:initialize-database ignore-failures="ALL">

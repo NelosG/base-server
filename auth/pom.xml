@@ -14,7 +14,8 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>data</module>
         <module>core</module>
+        <module>data</module>
+        <module>forms</module>
     </modules>
 </project>

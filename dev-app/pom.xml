@@ -21,12 +21,17 @@
         </dependency>
         <dependency>
             <groupId>nelos.parallel</groupId>
-            <artifactId>parallel-server-auth-data</artifactId>
+            <artifactId>parallel-server-auth-core</artifactId>
             <version>${parallel-server.version}</version>
         </dependency>
         <dependency>
             <groupId>nelos.parallel</groupId>
-            <artifactId>parallel-server-auth-core</artifactId>
+            <artifactId>parallel-server-forms</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-auth-forms</artifactId>
             <version>${parallel-server.version}</version>
         </dependency>
 

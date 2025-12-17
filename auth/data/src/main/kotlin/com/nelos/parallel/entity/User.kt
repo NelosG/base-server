@@ -1,6 +1,6 @@
 package com.nelos.parallel.entity
 
-import com.nelos.parallel.core.entity.AbstractEntity
+import com.nelos.parallel.commons.entity.AbstractEntity
 import com.nelos.parallel.enums.UserType
 import jakarta.persistence.*
 

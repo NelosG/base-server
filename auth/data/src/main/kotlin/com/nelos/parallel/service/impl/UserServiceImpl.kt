@@ -1,6 +1,6 @@
 package com.nelos.parallel.service.impl
 
-import com.nelos.parallel.core.service.impl.GenericServiceImpl
+import com.nelos.parallel.commons.service.impl.GenericServiceImpl
 import com.nelos.parallel.dao.UserDao
 import com.nelos.parallel.entity.User
 import com.nelos.parallel.service.UserService

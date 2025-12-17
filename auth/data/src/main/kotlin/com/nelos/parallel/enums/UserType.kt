@@ -1,7 +1,7 @@
 package com.nelos.parallel.enums
 
-import com.nelos.parallel.core.entity.enums.JpaEnum
-import com.nelos.parallel.core.entity.enums.JpaEnumConverter
+import com.nelos.parallel.commons.entity.enums.JpaEnum
+import com.nelos.parallel.commons.entity.enums.JpaEnumConverter
 import jakarta.persistence.Converter
 
 /**

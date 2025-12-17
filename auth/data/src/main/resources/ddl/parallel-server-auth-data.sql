@@ -3,7 +3,7 @@ CREATE TABLE prl_user
     id                 bigint PRIMARY KEY,
     login              varchar(100),
     encrypted_password varchar(100),
-    role               varchar(2)
+    type               varchar(2)
 );
 
 CREATE SEQUENCE seq_prl_user MINVALUE 0;
