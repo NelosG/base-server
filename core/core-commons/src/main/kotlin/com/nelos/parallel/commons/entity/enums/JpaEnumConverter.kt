@@ -10,26 +10,18 @@ import java.lang.reflect.ParameterizedType
 @Suppress("ConverterNotAnnotatedInspection")
 abstract class JpaEnumConverter<T : JpaEnum> : AttributeConverter<T, String> {
 
-    private val enumClass: Class<T> = run {
-        val type = this.javaClass.genericSuperclass as ParameterizedType
-        @Suppress("UNCHECKED_CAST")
-        type.actualTypeArguments[0] as Class<T>
-    }
+    @Suppress("UNCHECKED_CAST")
+    private val enumClass: Class<T> =
+        (javaClass.genericSuperclass as ParameterizedType).actualTypeArguments[0] as Class<T>
 
     override fun convertToDatabaseColumn(attribute: T?): String? {
         return attribute?.getDbKey()
     }
 
     override fun convertToEntityAttribute(dbData: String?): T? {
-        if (dbData == null) {
-            return null
+        return dbData?.let { key ->
+            enumClass.enumConstants.firstOrNull { it.getDbKey() == key }
+                ?: throw IllegalArgumentException("Invalid value '$key' for ${enumClass.simpleName}.")
         }
-        enumClass.enumConstants.forEach { prop ->
-            if (prop.getDbKey() == dbData) {
-                return prop
-            }
-        }
-        //TODO: Add logs
-        throw IllegalArgumentException(String.format("Invalid value '%s' for %s.", dbData, enumClass.simpleName))
     }
 }

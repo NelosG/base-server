@@ -1,6 +1,8 @@
 package com.nelos.parallel.commons.service.exceptions
 
 /**
+ * Exception thrown when a service-layer operation fails.
+ *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */

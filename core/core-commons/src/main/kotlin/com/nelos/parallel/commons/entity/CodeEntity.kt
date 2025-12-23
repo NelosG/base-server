@@ -4,6 +4,8 @@ import jakarta.persistence.Column
 import jakarta.persistence.MappedSuperclass
 
 /**
+ * Base entity with code, name, and description fields for dictionary-like entities.
+ *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */

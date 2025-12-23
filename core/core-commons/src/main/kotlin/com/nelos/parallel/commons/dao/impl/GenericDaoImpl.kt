@@ -8,6 +8,7 @@ import jakarta.persistence.criteria.CriteriaBuilder
 import jakarta.persistence.criteria.CriteriaQuery
 import jakarta.persistence.criteria.Order
 import jakarta.persistence.criteria.Root
+import org.slf4j.LoggerFactory
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
@@ -25,8 +26,9 @@ abstract class GenericDaoImpl<T : AbstractEntity> : DaoImpl<T>(), GenericDao<T> 
 
     @Transactional(propagation = Propagation.SUPPORTS, readOnly = true)
     override fun findById(id: Long): T {
-        return tryFindById(id)
-            ?: throw DaoException("Entity wasn't found")//TODO: add logs
+        return tryFindById(id) ?: throw DaoException(
+            "Entity ${entityClass.simpleName} with id=$id was not found"
+        ).also { LOG.warn(it.message) }
     }
 
     @Transactional(propagation = Propagation.SUPPORTS, readOnly = true)
@@ -54,5 +56,9 @@ abstract class GenericDaoImpl<T : AbstractEntity> : DaoImpl<T>(), GenericDao<T> 
             .createQuery(cd)
             .setParameter(AbstractEntity.ID, id)
             .executeUpdate()
+    }
+
+    companion object {
+        private val LOG = LoggerFactory.getLogger(GenericDaoImpl::class.java)
     }
 }

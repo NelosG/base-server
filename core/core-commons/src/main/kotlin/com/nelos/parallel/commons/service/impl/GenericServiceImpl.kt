@@ -32,43 +32,31 @@ abstract class GenericServiceImpl<T : AbstractEntity, DAO : GenericDao<T>> :
     override fun findAsStream(batchSize: Int): Stream<T> {
         var lastId = 0L
         return Stream.generate {
-            val res = transactionalProcessor.process<List<T>> {
+            val batch = transactionalProcessor.process<List<T>> {
                 invokeDaoMethod {
                     it.findByCondition(batchSize) { cb, cq, root ->
-                        cq.orderBy(
-                            cb.asc(
-                                root.get<String>(AbstractEntity.ID)
-                            )
-                        )
-
-                        cb.greaterThan(
-                            root.get(AbstractEntity.ID),
-                            lastId
-                        )
+                        cq.orderBy(cb.asc(root.get<String>(AbstractEntity.ID)))
+                        cb.greaterThan(root.get(AbstractEntity.ID), lastId)
                     }
                 }
             }
-            lastId = res.maxOfOrNull { it.id ?: error("entity id is null") } ?: Long.MAX_VALUE
-            res
-        }.takeWhile {
-            it.isNotEmpty()
-        }.flatMap {
-            it.stream()
-        }
+            lastId = batch.maxOfOrNull { it.id ?: error("Entity id must not be null") } ?: Long.MAX_VALUE
+            batch
+        }.takeWhile { it.isNotEmpty() }.flatMap { it.stream() }
     }
 
     @Transactional(propagation = Propagation.REQUIRED)
     override fun remove(entity: T) {
-        remove(entity.id ?: error("entity id is null"))
+        remove(entity.id ?: error("Entity id must not be null"))
     }
 
     @Transactional(propagation = Propagation.REQUIRED)
     override fun remove(ids: List<Long>) {
-        return ids.forEach(::remove)
+        ids.forEach(::remove)
     }
 
     @Transactional(propagation = Propagation.REQUIRED)
     override fun remove(id: Long) {
-        return invokeDaoMethod { it.remove(id) }
+        invokeDaoMethod { it.remove(id) }
     }
 }
