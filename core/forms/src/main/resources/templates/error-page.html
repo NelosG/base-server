@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark" lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <title>Error</title>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
+    </head>
+    <body>
+        <div class="container">
+            <div class="error-container text-center">
+                <i class="bi bi-exclamation-triangle text-warning" style="font-size: 3rem;"></i>
+                <div class="error-code" data-url-param="status"></div>
+                <p class="text-muted">Error on request: <code data-url-param="path"></code></p>
+                <p class="lead mb-4" data-url-param="message"></p>
+                <div class="back-button">
+                    <a class="btn btn-primary btn-lg me-3" data-url-href="referer" href="/">Back</a>
+                </div>
+                <div class="mt-4">
+                    <a class="btn btn-link" href="/">Main page</a>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
