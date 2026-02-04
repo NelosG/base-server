@@ -1,9 +1,9 @@
-package com.nelos.parallel.service.impl
+package com.nelos.parallel.auth.service.impl
 
+import com.nelos.parallel.auth.dao.UserDao
+import com.nelos.parallel.auth.entity.User
+import com.nelos.parallel.auth.service.UserService
 import com.nelos.parallel.commons.service.impl.GenericServiceImpl
-import com.nelos.parallel.dao.UserDao
-import com.nelos.parallel.entity.User
-import com.nelos.parallel.service.UserService
 import org.springframework.stereotype.Service
 
 /**

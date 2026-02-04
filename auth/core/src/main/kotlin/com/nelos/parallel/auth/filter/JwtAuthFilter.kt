@@ -3,12 +3,16 @@ package com.nelos.parallel.auth.filter
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.slf4j.LoggerFactory
 import org.springframework.security.authentication.AuthenticationManager
+import org.springframework.security.core.AuthenticationException
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken
 import org.springframework.web.filter.OncePerRequestFilter
 
 /**
+ * Servlet filter that extracts a JWT token from the Authorization header and authenticates the request.
+ *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
@@ -21,25 +25,27 @@ class JwtAuthFilter(
         response: HttpServletResponse,
         filterChain: FilterChain
     ) {
-        val requestTokenHeader = request.getHeader("Authorization") //Extract the Authorization Header:
+        val header = request.getHeader("Authorization")
 
-
-        if (requestTokenHeader == null || !requestTokenHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response)
-            return
+        val token = header
+            ?.takeIf { it.startsWith("Bearer ") }
+            ?.removePrefix("Bearer ")
+            ?.trim()
+        if (!token.isNullOrBlank()) {
+            val authenticationToken = PreAuthenticatedAuthenticationToken(null, token).apply {
+                details = WebAuthenticationDetailsSource().buildDetails(request)
+            }
+            try {
+                authenticationManager.authenticate(authenticationToken)
+            } catch (e: AuthenticationException) {
+                LOG.debug("JWT authentication failed for request {}: {}", request.requestURI, e.message)
+            }
         }
 
-
-        //Ensure that the token in the header is correctly formatted as "Bearer <your-jwt-token>".
-        val token = requestTokenHeader.split("Bearer ".toRegex()).dropLastWhile { it.isEmpty() }
-            .toTypedArray()[1] // Extract JWT token from the header
-
-        val authenticationToken = PreAuthenticatedAuthenticationToken(null, token)
-        authenticationToken.details = WebAuthenticationDetailsSource().buildDetails(request)
-
-        authenticationManager.authenticate(authenticationToken)
-
-        //Continue the Filter Chain
         filterChain.doFilter(request, response)
+    }
+
+    companion object {
+        private val LOG = LoggerFactory.getLogger(JwtAuthFilter::class.java)
     }
 }

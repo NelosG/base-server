@@ -1,4 +1,4 @@
-package com.nelos.parallel.enums
+package com.nelos.parallel.auth.enums
 
 import com.nelos.parallel.commons.entity.enums.JpaEnum
 import com.nelos.parallel.commons.entity.enums.JpaEnumConverter

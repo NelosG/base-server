@@ -1,7 +1,7 @@
-package com.nelos.parallel.service
+package com.nelos.parallel.auth.service
 
+import com.nelos.parallel.auth.entity.User
 import com.nelos.parallel.commons.service.GenericService
-import com.nelos.parallel.entity.User
 
 /**
  * @author gpushkarev

@@ -1,8 +1,8 @@
-package com.nelos.parallel.dao.impl
+package com.nelos.parallel.auth.dao.impl
 
+import com.nelos.parallel.auth.dao.UserDao
+import com.nelos.parallel.auth.entity.User
 import com.nelos.parallel.commons.dao.impl.GenericDaoImpl
-import com.nelos.parallel.dao.UserDao
-import com.nelos.parallel.entity.User
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional

@@ -1,7 +1,7 @@
-package com.nelos.parallel.dao
+package com.nelos.parallel.auth.dao
 
+import com.nelos.parallel.auth.entity.User
 import com.nelos.parallel.commons.dao.GenericDao
-import com.nelos.parallel.entity.User
 
 /**
  * @author gpushkarev

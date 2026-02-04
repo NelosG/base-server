@@ -1,47 +1,43 @@
 <!DOCTYPE html>
-<html data-bs-theme="dark" lang="en" xmlns:th="http://www.thymeleaf.org">
-    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
+<html data-bs-theme="dark" lang="en">
     <head>
+        <meta charset="UTF-8">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
         <title>Admin</title>
-
-        <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}"/>
-        <link rel="stylesheet" th:href="@{/css/main.css}"/>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
+        <script src="/js/navbar.js"></script>
     </head>
     <body>
 
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-            <div class="container-fluid">
-                <div class="navbar-nav me-auto">
-                    <form class="d-inline" method="post" th:action="@{/logout}">
-                        <a class="btn btn-outline-light" href="/">Back to Home Page</a>
-                    </form>
+        <div class="container mt-4">
+            <div class="row justify-content-center">
+                <div class="col-md-6 col-lg-4">
+                    <div class="card"
+                         data-view-save="createAdmin"
+                         data-view-service="prl.adminViewService">
+                        <div class="card-header text-center">
+                            <h4 class="mb-0"><i class="bi bi-shield-lock"></i> Create Admin</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert d-none" data-view-alert></div>
+                            <div class="mb-3">
+                                <label class="form-label" for="login">Login</label>
+                                <input autofocus class="form-control" id="login"
+                                       name="login" placeholder="Enter login" type="text">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="password">Password</label>
+                                <input class="form-control" id="password"
+                                       name="password" placeholder="Enter password" type="password">
+                            </div>
+                            <button class="btn btn-primary w-100" data-view-save-btn>Create admin</button>
+                        </div>
+                    </div>
                 </div>
-                <div class="navbar-nav ms-auto">
-                    <form class="d-inline" method="post" th:action="@{/logout}">
-                        <button class="btn btn-outline-light" type="submit">Logout</button>
-                    </form>
-                </div>
-            </div>
-        </nav>
-
-        <div class="card form-control">
-            <div class="card-body">
-                <a class="btn btn-primary" th:href="@{/settings}">Settings</a>
             </div>
         </div>
-
-        <form class="form-control" method="POST" th:action="@{/admin/create-admin}" th:object="${data}">
-            <div class="form-group">
-                <label> Login
-                    <input autofocus="autofocus"
-                           class="form-control" name="login" placeholder="login"
-                           th:field="*{login}" type="text"></label>
-                <label>Password
-                    <input class="form-control"
-                           name="password" placeholder="Enter Password" th:field="*{password}"
-                           type="password"/></label>
-                <input class="btn btn-primary" type="submit" value="Create admin"/>
-            </div>
-        </form>
     </body>
 </html>
