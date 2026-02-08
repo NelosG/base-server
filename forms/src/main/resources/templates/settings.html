@@ -1,28 +1,58 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" data-bs-theme="dark">
-    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
+<html data-bs-theme="dark" lang="en">
     <head>
+        <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
         <title>Settings</title>
-
-        <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}"/>
-        <link rel="stylesheet" th:href="@{/css/main.css}"/>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
+        <script src="/js/navbar.js"></script>
     </head>
     <body>
 
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-            <div class="container-fluid">
-                <div class="navbar-nav me-auto">
-                    <form th:action="@{/logout}" method="post" class="d-inline">
-                        <a class="btn btn-outline-light" href="/">Back to Home Page</a>
-                    </form>
-                </div>
-                <div class="navbar-nav ms-auto">
-                    <form th:action="@{/logout}" method="post" class="d-inline">
-                        <button type="submit" class="btn btn-outline-light">Logout</button>
-                    </form>
+        <div class="container mt-4">
+            <div class="row justify-content-center">
+                <div class="col-md-8 col-lg-6"
+                     data-view-load="getSettings"
+                     data-view-save="saveSettings"
+                     data-view-service="prl.settingsViewService">
+
+                    <h2><i class="bi bi-gear"></i> Settings</h2>
+                    <div class="alert d-none" data-view-alert></div>
+
+                    <div class="card mt-3" data-view-form style="display:none;">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label" for="theme">Theme</label>
+                                <select class="form-select" data-view-options="getThemes" id="theme"
+                                        name="theme"></select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="language">Language</label>
+                                <select class="form-select" data-view-options="getLanguages" id="language"
+                                        name="language"></select>
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input class="form-check-input" id="notificationsEnabled"
+                                       name="notificationsEnabled" type="checkbox">
+                                <label class="form-check-label" for="notificationsEnabled">
+                                    Enable notifications
+                                </label>
+                            </div>
+                            <button class="btn btn-primary" data-view-save-btn>Save</button>
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-3" data-view-loading>
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </nav>
+        </div>
 
     </body>
 </html>
