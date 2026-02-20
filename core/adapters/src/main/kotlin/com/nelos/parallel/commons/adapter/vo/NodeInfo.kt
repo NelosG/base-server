@@ -5,6 +5,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.nelos.parallel.commons.adapter.enums.TransportType
+import com.nelos.parallel.commons.adapter.vo.response.ResourceProviderInfo
+import com.nelos.parallel.commons.adapter.vo.response.TransportConfig
+import com.nelos.parallel.commons.adapter.vo.response.TransportInfo
 import java.time.Instant
 
 /**
@@ -17,10 +20,14 @@ import java.time.Instant
 @JsonIgnoreProperties(ignoreUnknown = true)
 class NodeInfo @JsonCreator constructor(
     @param:JsonProperty("nodeId") val nodeId: String,
-    @param:JsonProperty("transport") val transport: TransportType,
-    @param:JsonProperty("host") val host: String,
-    @param:JsonProperty("port") val port: Int,
-    @param:JsonProperty("authToken") val authToken: String?,
     @param:JsonProperty("capabilities") val capabilities: Map<String, Any?>? = null,
+    @param:JsonProperty("transports") val transports: List<TransportInfo>? = null,
+    @param:JsonProperty("resourceProviders") val resourceProviders: List<ResourceProviderInfo>? = null,
     @param:JsonProperty("registeredAt") val registeredAt: Instant = Instant.now()
 )
+
+fun NodeInfo.findTransport(type: TransportType): TransportInfo? =
+    transports?.firstOrNull { it.type == type }
+
+fun NodeInfo.findHttpConfig(): TransportConfig.HttpConfig? =
+    findTransport(TransportType.HTTP)?.config as? TransportConfig.HttpConfig
