@@ -1,16 +1,9 @@
 package com.nelos.parallel.commons.dao.exceptions
 
 /**
+ * Exception thrown when a DAO operation fails.
+ *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
-class DaoException : RuntimeException {
-
-    constructor() : super()
-
-    constructor(message: String?) : super(message)
-
-    constructor(message: String?, cause: Throwable?) : super(message, cause)
-
-    constructor(cause: Throwable?) : super(cause)
-}
+class DaoException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)

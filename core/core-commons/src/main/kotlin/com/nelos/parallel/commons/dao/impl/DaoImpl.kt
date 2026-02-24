@@ -23,12 +23,9 @@ abstract class DaoImpl<T : Entity> : Dao<T> {
 
     protected open val defaultOrder: TerFunction<CriteriaBuilder, CriteriaQuery<T>, Root<T>, Order>? = null
 
-    override val entityClass: Class<T> = run {
-        val genericSuperclass = javaClass.genericSuperclass as ParameterizedType
-        val genericParameters = genericSuperclass.actualTypeArguments
-        @Suppress("UNCHECKED_CAST")
-        genericParameters[0] as Class<T>
-    }
+    @Suppress("UNCHECKED_CAST")
+    override val entityClass: Class<T> =
+        (javaClass.genericSuperclass as ParameterizedType).actualTypeArguments[0] as Class<T>
 
     @Transactional(propagation = Propagation.SUPPORTS, readOnly = true)
     override fun findAll(): List<T> {
@@ -37,15 +34,9 @@ abstract class DaoImpl<T : Entity> : Dao<T> {
         val root = cq.from(entityClass)
 
         cq.select(root)
-        val order = defaultOrder?.apply(cb, cq, root)
+        defaultOrder?.apply(cb, cq, root)?.let { cq.orderBy(it) }
 
-        if (order != null) {
-            cq.orderBy(order)
-        }
-        val query = entityManager.createQuery(
-            cq
-        )
-        return query.resultList//TODO: rewrite
+        return entityManager.createQuery(cq).resultList
     }
 
     @Transactional(propagation = Propagation.SUPPORTS, readOnly = true)
@@ -62,14 +53,11 @@ abstract class DaoImpl<T : Entity> : Dao<T> {
         val cq = cb.createQuery(entityClass)
         val root = cq.from(entityClass)
 
-        if (conditions != null) {
-            cq.where(
-                conditions.apply(cb, cq, root)
-            )
-        }
-        val query = entityManager.createQuery(cq)
-        query.maxResults = min(limit, QUERY_LIMIT)
-        return query.resultList
+        conditions?.apply(cb, cq, root)?.let { cq.where(it) }
+
+        return entityManager.createQuery(cq)
+            .apply { maxResults = min(limit, QUERY_LIMIT) }
+            .resultList
     }
 
     @Transactional(propagation = Propagation.REQUIRED)
@@ -83,10 +71,10 @@ abstract class DaoImpl<T : Entity> : Dao<T> {
     }
 
     override fun <K> runInTransaction(supplier: Supplier<K>): K {
-        this.entityManager.transaction.begin()
-        val res = supplier.get()
-        this.entityManager.transaction.commit()
-        return res
+        entityManager.transaction.begin()
+        val result = supplier.get()
+        entityManager.transaction.commit()
+        return result
     }
 
     companion object {
