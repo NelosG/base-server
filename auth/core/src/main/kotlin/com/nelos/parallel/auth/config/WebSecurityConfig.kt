@@ -1,14 +1,12 @@
 package com.nelos.parallel.auth.config
 
+import com.nelos.parallel.auth.enums.UserType
 import com.nelos.parallel.auth.filter.CookieJwtAuthenticationFilter
 import com.nelos.parallel.auth.filter.JwtAuthFilter
 import com.nelos.parallel.auth.service.UserDetailsProviderService
-import com.nelos.parallel.enums.UserType
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.http.HttpStatus
-import org.springframework.http.MediaType
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.AuthenticationProvider
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider
@@ -24,8 +22,9 @@ import org.springframework.security.web.csrf.CsrfFilter
 import org.springframework.web.filter.CharacterEncodingFilter
 import java.nio.charset.StandardCharsets
 
-
 /**
+ * Spring Security configuration: defines the filter chain, authentication providers, and access rules.
+ *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
@@ -36,83 +35,58 @@ class WebSecurityConfig @Autowired constructor(
 ) {
 
     @Autowired(required = false)
-    private var authenticationProviders: MutableList<AuthenticationProvider> = mutableListOf()
+    private var authenticationProviders: List<AuthenticationProvider> = emptyList()
 
     @Bean
-    fun passwordEncoder(): PasswordEncoder {
-        return BCryptPasswordEncoder()
-    }
+    fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
 
     @Bean
     fun authenticationProvider(passwordEncoder: PasswordEncoder): AuthenticationProvider {
-        val authProvider = DaoAuthenticationProvider(userDetailsProviderService)
-        authProvider.setPasswordEncoder(passwordEncoder)
-        return authProvider
+        return DaoAuthenticationProvider(userDetailsProviderService).apply {
+            setPasswordEncoder(passwordEncoder)
+        }
     }
 
     @Bean
     fun authManager(http: HttpSecurity): AuthenticationManager {
-        val authenticationManagerBuilder = http.getSharedObject(AuthenticationManagerBuilder::class.java)
-
-        for (provider in authenticationProviders) {
-            authenticationManagerBuilder.authenticationProvider(provider)
-        }
-        return authenticationManagerBuilder.build()
+        val builder = http.getSharedObject(AuthenticationManagerBuilder::class.java)
+        authenticationProviders.forEach { builder.authenticationProvider(it) }
+        return builder.build()
     }
 
     @Bean
     fun securityFilterChain(http: HttpSecurity, authenticationManager: AuthenticationManager): SecurityFilterChain {
         http
-            .csrf { csrf -> csrf.disable() }
-            .sessionManagement { session ->
-                session.sessionCreationPolicy(
-                    SessionCreationPolicy.STATELESS
-                )
-            }
-            .formLogin { formLogin ->
-                formLogin.loginPage("/login")
-                    .defaultSuccessUrl("/", true)
-                    .failureUrl("/login?error=true")
-                    .permitAll()
-            }
+            .csrf { it.disable() }
+            .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .logout { logout ->
                 logout.logoutUrl("/logout")
                     .logoutSuccessUrl("/login?logout=true")
                     .invalidateHttpSession(true)
-                    .deleteCookies(
-                        "JSESSIONID",
-                        CookieJwtAuthenticationFilter.COOKIE_NAME
-                    )
+                    .deleteCookies("JSESSIONID", CookieJwtAuthenticationFilter.COOKIE_NAME)
                     .permitAll()
             }
             .authorizeHttpRequests { authorize ->
                 authorize
-                    .requestMatchers("/").permitAll()
-                    .requestMatchers("/login", "/login/**","/register", "/register/**").permitAll()
-                    .requestMatchers("/endpoint", "/error" ).permitAll()
+                    .requestMatchers("/login", "/register").permitAll()
+                    .requestMatchers("/api/view/**").permitAll()
+                    .requestMatchers("/api/register", "/api/callback/**").permitAll()
+                    .requestMatchers("/endpoint", "/error", "/error-page").permitAll()
                     .requestMatchers("/webjars/**", "/css/**", "/js/**", "/images/**").permitAll()
                     .requestMatchers("/admin/**").hasRole(UserType.ADMIN.name)
                     .anyRequest().authenticated()
-            }.exceptionHandling { exceptions ->
-                exceptions
-                    .authenticationEntryPoint { request, response, authException ->
-                        // Только для случаев, когда пользователь не аутентифицирован
-                        response.status = HttpStatus.UNAUTHORIZED.value()
-                        response.contentType = MediaType.APPLICATION_JSON_VALUE
-                        response.writer.write("""{"error": "Unauthorized", "message": "${authException.message}"}""")
-                        response.sendRedirect("/login?unauthorized=true")
-                    }
-                    .accessDeniedHandler { request, response, accessDeniedException ->
-                        // Только для случаев, когда у пользователя нет прав
-                        response.status = HttpStatus.FORBIDDEN.value()
-                        response.contentType = MediaType.APPLICATION_JSON_VALUE
-                        response.writer.write("""{"error": "Forbidden", "message": "${accessDeniedException.message}"}""")
-                    }
-            }.authenticationManager(authenticationManager)
+            }
+            .exceptionHandling { exceptions ->
+                exceptions.authenticationEntryPoint { _, response, _ ->
+                    response.sendRedirect("/login?unauthorized=true")
+                }
+            }
+            .authenticationManager(authenticationManager)
 
-        val encodingFilter = CharacterEncodingFilter()
-        encodingFilter.encoding = StandardCharsets.UTF_8.name()
-        encodingFilter.setForceEncoding(true)
+        val encodingFilter = CharacterEncodingFilter().apply {
+            encoding = StandardCharsets.UTF_8.name()
+            setForceEncoding(true)
+        }
 
         http.addFilterBefore(encodingFilter, CsrfFilter::class.java)
             .addFilterBefore(JwtAuthFilter(authenticationManager), UsernamePasswordAuthenticationFilter::class.java)

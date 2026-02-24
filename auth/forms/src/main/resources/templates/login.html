@@ -1,69 +1,49 @@
 <!DOCTYPE html>
-<html data-bs-theme="dark" lang="en" xmlns:th="http://www.thymeleaf.org">
-    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
+<html data-bs-theme="dark" lang="en">
     <head>
+        <meta charset="UTF-8">
         <meta content="width=device-width, initial-scale=1.0" name="viewport">
         <title>Login</title>
-
-        <script th:src="@{/webjars/bootstrap/5.3.8/js/bootstrap.bundle.min.js}"></script>
-
-        <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}"/>
-        <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css}"/>
-        <link rel="stylesheet" th:href="@{/css/main.css}"/>
+        <script src="/webjars/bootstrap/5.3.8/js/bootstrap.bundle.min.js"></script>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
     </head>
     <body class="login-body">
         <div class="container">
-            <div class="login-container">
-                <!-- Заголовок -->
+            <div class="login-container"
+                 data-view-redirect="/"
+                 data-view-save="signIn"
+                 data-view-service="prl.loginViewService">
+
                 <div class="login-header">
-                    <h2>Auth</h2>
+                    <i class="bi bi-cpu prl-dashboard-icon" style="font-size: 2.5rem;"></i>
+                    <h2 style="font-family: var(--prl-mono); font-weight: 700; letter-spacing: 0.03em;">Parallel</h2>
                 </div>
 
-                <!-- Сообщения об ошибках/успехе -->
-                <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${errorMessage}">
-                    <span th:text="${errorMessage}"></span>
-                    <button class="btn-close" data-bs-dismiss="alert" type="button"></button>
+                <div class="alert d-none"
+                     data-url-alert='{"error":"Invalid login or password!","unauthorized":"Unauthorized!","logout":"Successful logout"}'
+                     data-view-alert></div>
+
+                <div class="form-group">
+                    <label class="form-label">Login
+                        <input autofocus class="form-control" name="login" placeholder="Login" required type="text">
+                    </label>
                 </div>
-
-                <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${logoutMessage}">
-                    <span th:text="${logoutMessage}"></span>
-                    <button class="btn-close" data-bs-dismiss="alert" type="button"></button>
+                <div class="form-group">
+                    <label class="form-label">Password
+                        <input class="form-control" name="password" placeholder="Password" required type="password">
+                    </label>
                 </div>
-
-                <!-- Форма логина -->
-                <form method="POST" th:action="@{/login/sign-in}">
-                    <!-- Поле логина -->
-                    <div class="form-group">
-                        <label class="form-label">Login<input autofocus
-                                                              class="form-control"
-                                                              name="login"
-                                                              placeholder="Login"
-                                                              required
-                                                              type="text">
-                        </label>
-                    </div>
-
-                    <!-- Поле пароля -->
-                    <div class="form-group">
-                        <label class="form-label">Password<input class="form-control"
-                                                                 name="password"
-                                                                 placeholder="Password"
-                                                                 required
-                                                                 type="password">
-                        </label>
-                    </div>
-
-                    <!-- Кнопка отправки -->
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-primary btn-lg" type="submit">
-                            <i class="bi bi-box-arrow-in-right"></i> Sign In
-                        </button>
-                    </div>
-                    <div class="mt-1 text-end">
-                        <a class="btn btn-link" th:href="@{/register}">Sing Up</a>
-                    </div>
-                </form>
-
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary btn-lg" data-view-save-btn>
+                        <i class="bi bi-box-arrow-in-right"></i> Sign In
+                    </button>
+                </div>
+                <div class="mt-1 text-end">
+                    <a class="btn btn-link" href="/register">Sign Up</a>
+                </div>
             </div>
         </div>
     </body>

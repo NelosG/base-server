@@ -1,7 +1,7 @@
-package com.nelos.parallel.entity
+package com.nelos.parallel.auth.entity
 
+import com.nelos.parallel.auth.enums.UserType
 import com.nelos.parallel.commons.entity.AbstractEntity
-import com.nelos.parallel.enums.UserType
 import jakarta.persistence.*
 
 /**
