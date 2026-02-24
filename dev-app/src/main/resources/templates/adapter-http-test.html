@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark" lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <title>HTTP Adapter Test</title>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <link href="/webjars/highlightjs/11.11.1/styles/atom-one-dark.min.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
+        <script src="/js/navbar.js"></script>
+        <script src="/webjars/highlightjs/11.11.1/highlight.min.js"></script>
+        <script src="/js/code-editor.js"></script>
+        <script src="/js/adapter-test-common.js"></script>
+    </head>
+    <body>
+        <div class="container mt-4">
+            <h2>
+                <i class="bi bi-globe"></i> HTTP Adapter Test
+                <span class="prl-transport-badge prl-transport-http">HTTP</span>
+            </h2>
+            <p class="text-muted">Orchestrator-side test panel for C-tests-runner HTTP nodes</p>
+
+            <!-- Registered Nodes -->
+            <div class="card mt-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-hdd-network"></i> Registered Nodes</span>
+                    <button class="btn btn-sm btn-outline-light" onclick="AdapterTestCommon.refreshNodes()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="text-center" id="nodes-loading">
+                        <div class="spinner-border spinner-border-sm"></div>
+                        Loading...
+                    </div>
+                    <table class="table table-sm table-hover" id="nodes-table" style="display:none;">
+                        <thead>
+                            <tr>
+                                <th>Node ID</th>
+                                <th>Host</th>
+                                <th>Port</th>
+                                <th>Capabilities</th>
+                                <th>Registered</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nodes-tbody"></tbody>
+                    </table>
+                    <div class="prl-empty-state" id="nodes-empty" style="display:none;">
+                        <i class="bi bi-hdd-network"></i>
+                        <span>No nodes registered. Start a C-tests-runner instance to connect.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="row mt-3">
+                <!-- Node Actions -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header"><i class="bi bi-terminal"></i> Node Actions</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Target Node ID</label>
+                                <input class="form-control font-mono" id="target-node-id"
+                                       placeholder="Select from table or type node ID">
+                                <small class="text-muted">Click a row above to auto-fill</small>
+                            </div>
+                            <div class="btn-group-vertical w-100 gap-1">
+                                <button class="btn btn-outline-primary" onclick="AdapterTestCommon.doHealthCheck()">
+                                    <i class="bi bi-heart-pulse"></i> Health Check
+                                </button>
+                                <button class="btn btn-outline-info" onclick="AdapterTestCommon.doPollStatus()">
+                                    <i class="bi bi-activity"></i> Poll Status
+                                </button>
+                                <button class="btn btn-outline-success" onclick="AdapterTestCommon.doQueueStatus()">
+                                    <i class="bi bi-bar-chart"></i> Queue Status
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="AdapterTestCommon.doListAdapters()">
+                                    <i class="bi bi-plug"></i> List Adapters
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="AdapterTestCommon.doListAvailable()">
+                                    <i class="bi bi-box-seam"></i> Available Adapters
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Adapter Management -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header"><i class="bi bi-plug"></i> Adapter Management</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Adapter Name</label>
+                                <select class="form-select" id="adapter-name">
+                                    <option value="">-- select a node first --</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Config JSON</label>
+                                <textarea class="form-control font-mono" id="adapter-config"
+                                          rows="1" placeholder='{}'></textarea>
+                                <small class="text-muted">Optional configuration object</small>
+                            </div>
+                            <div class="btn-group w-100">
+                                <button class="btn btn-success" onclick="AdapterTestCommon.doLoadAdapter()">
+                                    <i class="bi bi-plus-circle"></i> Load
+                                </button>
+                                <button class="btn btn-warning" onclick="AdapterTestCommon.doUnloadAdapter()">
+                                    <i class="bi bi-dash-circle"></i> Unload
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Task -->
+            <div class="card mt-3">
+                <div class="card-header"><i class="bi bi-send"></i> Submit Task</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Job ID</label>
+                            <input class="form-control font-mono" id="task-job-id" placeholder="auto-generated if empty"
+                                   type="text">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Test ID</label>
+                            <input class="form-control" id="task-test-id" placeholder="from folder name if empty" type="text">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Mode</label>
+                            <select class="form-select" id="task-mode">
+                                <option value="all">all</option>
+                                <option value="correctness">correctness</option>
+                                <option value="performance">performance</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Threads</label>
+                            <input class="form-control" id="task-threads" placeholder="default" type="number">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Solution Git URL</label>
+                            <input class="form-control" id="task-solution-url" placeholder="https://...">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Solution Dir</label>
+                            <input class="form-control" id="task-solution-dir" placeholder="optional subdir">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Tests Git URL</label>
+                            <input class="form-control" id="task-tests-url" placeholder="https://...">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Tests Dir</label>
+                            <input class="form-control" id="task-tests-dir" placeholder="optional subdir">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="AdapterTestCommon.doSubmitTask()">
+                        <i class="bi bi-play-fill"></i> Submit Task
+                    </button>
+                </div>
+            </div>
+
+            <!-- Job Status -->
+            <div class="card mt-3">
+                <div class="card-header"><i class="bi bi-search"></i> Job Status</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Job ID</label>
+                            <input class="form-control font-mono" id="job-status-id" list="job-ids-datalist"
+                                   placeholder="e.g. j-a3f7b2c1" type="text">
+                            <datalist id="job-ids-datalist"></datalist>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-outline-info" onclick="AdapterTestCommon.doQueryJobStatus()">
+                            <i class="bi bi-search"></i> Query Status
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="AdapterTestCommon.doCancelJob()">
+                            <i class="bi bi-x-circle"></i> Cancel Job
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Response Log -->
+            <div class="card mt-3 mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-journal-text"></i> Response Log</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="AdapterTestCommon.clearLog()">
+                        <i class="bi bi-x-lg"></i> Clear
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="response-log" id="response-log">
+                        <div class="prl-log-placeholder prl-empty-state">
+                            <i class="bi bi-terminal"></i><span>Waiting for actions...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            AdapterTestCommon.initPage("prl.httpAdapterTestViewService", {transportType: "HTTP"});
+        </script>
+    </body>
+</html>

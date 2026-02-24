@@ -1,24 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<beans xmlns="http://www.springframework.org/schema/beans"
-       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-       xmlns:util="http://www.springframework.org/schema/util"
-       xmlns:context="http://www.springframework.org/schema/context"
+<beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+       xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+       xmlns="http://www.springframework.org/schema/beans"
        xsi:schemaLocation="http://www.springframework.org/schema/beans
        http://www.springframework.org/schema/beans/spring-beans.xsd
-       http://www.springframework.org/schema/util
-       https://www.springframework.org/schema/util/spring-util.xsd
-       http://www.springframework.org/schema/context
-       https://www.springframework.org/schema/context/spring-context.xsd
 	   http://www.springframework.org/schema/jdbc
-       http://www.springframework.org/schema/jdbc/spring-jdbc.xsd">
+       http://www.springframework.org/schema/jdbc/spring-jdbc.xsd
+       http://www.springframework.org/schema/rabbit
+       http://www.springframework.org/schema/rabbit/spring-rabbit.xsd"
+>
 
 
     <bean id="dataSource" class="com.zaxxer.hikari.HikariDataSource" destroy-method="close">
         <property name="driverClassName" value="org.postgresql.Driver"/>
         <property name="jdbcUrl" value="jdbc:postgresql://localhost:5432/parallel"/>
-        <property name="username" value="nelos"/>
-        <property name="password" value="nelos"/>
+        <property name="username" value="guest"/>
+        <property name="password" value="guest"/>
 
         <!-- Настройки пула соединений -->
         <property name="connectionTimeout" value="30000"/>
@@ -42,6 +40,38 @@
     <jdbc:initialize-database ignore-failures="ALL">
         <jdbc:script location="classpath*:ddl/*.sql"/>
     </jdbc:initialize-database>
+
+    <bean id="prl.nodeRestClient" class="org.springframework.web.client.RestClient" factory-method="create"/>
+
+    <bean id="prl.httpNodeAdapter" class="com.nelos.parallel.adapters.http.impl.HttpNodeAdapterImpl">
+        <constructor-arg ref="prl.nodeRestClient"/>
+    </bean>
+
+    <rabbit:connection-factory id="rabbitConnectionFactory"
+                               host="${rabbitmq.host:localhost}"
+                               port="${rabbitmq.port:5672}"
+                               username="${rabbitmq.username:guest}"
+                               password="${rabbitmq.password:guest}"
+                               virtual-host="${rabbitmq.vhost:/}"/>
+
+    <rabbit:template id="prl.rabbitTemplate" connection-factory="rabbitConnectionFactory"/>
+
+    <rabbit:admin id="prl.rabbitAdmin" connection-factory="rabbitConnectionFactory"/>
+
+    <bean id="prl.rabbitNodeAdapter" class="com.nelos.parallel.adapters.rabbit.impl.RabbitNodeAdapterImpl">
+        <constructor-arg ref="prl.rabbitTemplate"/>
+        <constructor-arg>
+            <bean class="com.fasterxml.jackson.databind.ObjectMapper"/>
+        </constructor-arg>
+    </bean>
+
+
+    <rabbit:annotation-driven/>
+
+    <bean id="rabbitListenerContainerFactory"
+          class="org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory">
+        <property name="connectionFactory" ref="rabbitConnectionFactory"/>
+    </bean>
 
     <bean class="org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor"/>
 

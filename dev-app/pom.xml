@@ -35,6 +35,28 @@
             <version>${parallel-server.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-git</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-adapters-http</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-adapters-rabbit</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-jobs</artifactId>
+            <version>${parallel-server.version}</version>
+            <scope>compile</scope>
+        </dependency>
+
         <!-- SPRING -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
