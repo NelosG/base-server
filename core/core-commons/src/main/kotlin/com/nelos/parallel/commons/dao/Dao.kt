@@ -56,7 +56,7 @@ interface Dao<T : Entity> {
     fun remove(entity: T)
 
     /**
-     * Executes the [supplier] within a manual transaction and returns the result.
+     * Executes the [supplier] within a new transaction and returns the result.
      */
     fun <K> runInTransaction(supplier: Supplier<K>): K
 

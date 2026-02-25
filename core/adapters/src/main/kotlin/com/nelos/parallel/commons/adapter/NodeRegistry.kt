@@ -35,4 +35,16 @@ interface NodeRegistry {
      * Returns all nodes using the specified [transport].
      */
     fun findByTransport(transport: TransportType): List<NodeInfo>
+
+    /**
+     * Removes a single transport from the node's transport list.
+     * If no transports remain after removal, the entire node is deregistered and `null` is returned.
+     * Otherwise returns the updated [NodeInfo].
+     */
+    fun removeTransport(nodeId: String, transportType: TransportType): NodeInfo?
+
+    /**
+     * Replaces the stored node info with the given [node].
+     */
+    fun updateNode(node: NodeInfo): NodeInfo
 }
