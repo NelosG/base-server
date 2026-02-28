@@ -39,7 +39,7 @@ abstract class ServiceImpl<T : Entity, DAO : Dao<T>> :
         entities.forEach(::remove)
     }
 
-    fun <R> invokeDaoMethod(function: (DAO) -> R): R {
+    protected fun <R> invokeDaoMethod(function: (DAO) -> R): R {
         return try {
             function(dao)
         } catch (e: Exception) {

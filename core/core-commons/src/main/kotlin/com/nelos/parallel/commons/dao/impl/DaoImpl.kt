@@ -70,11 +70,9 @@ abstract class DaoImpl<T : Entity> : Dao<T> {
         return entities.map(::save)
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun <K> runInTransaction(supplier: Supplier<K>): K {
-        entityManager.transaction.begin()
-        val result = supplier.get()
-        entityManager.transaction.commit()
-        return result
+        return supplier.get()
     }
 
     companion object {
