@@ -3,10 +3,12 @@ package com.nelos.parallel.adapters.rabbit.listener
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.nelos.parallel.adapters.rabbit.RabbitConstants
 import com.nelos.parallel.commons.adapter.NodeRegistry
+import com.nelos.parallel.commons.adapter.NodeTransportManager
+import com.nelos.parallel.commons.adapter.enums.NodeEventType
 import com.nelos.parallel.commons.adapter.enums.TransportType
 import com.nelos.parallel.commons.adapter.vo.NodeInfo
-import com.nelos.parallel.commons.adapter.vo.NodeRegistrationRequest
-import com.nelos.parallel.commons.adapter.vo.NodeRegistrationResponse
+import com.nelos.parallel.commons.adapter.vo.request.NodeRegistrationRequest
+import com.nelos.parallel.commons.adapter.vo.response.NodeRegistrationResponse
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.core.Message
 import org.springframework.amqp.core.MessageProperties
@@ -15,10 +17,9 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 import java.time.Instant
-import java.util.*
 
 /**
- * Listens for node registration and deregistration events on the
+ * Listens for node online/offline events on the
  * [com.nelos.parallel.adapters.rabbit.RabbitConstants.NODE_EVENTS_QUEUE] and updates the [NodeRegistry].
  *
  * @author gpushkarev
@@ -28,7 +29,8 @@ import java.util.*
 class RabbitNodeEventListener @Autowired constructor(
     private val objectMapper: ObjectMapper,
     private val nodeRegistry: NodeRegistry,
-    private val rabbitTemplate: RabbitTemplate
+    private val rabbitTemplate: RabbitTemplate,
+    private val transportManager: NodeTransportManager,
 ) {
 
     @RabbitListener(queues = [RabbitConstants.NODE_EVENTS_QUEUE])
@@ -42,36 +44,33 @@ class RabbitNodeEventListener @Autowired constructor(
     }
 
     private fun handleEvent(request: NodeRegistrationRequest, properties: MessageProperties) {
-        when (request.type ?: NodeRegistrationRequest.DEFAULT_TYPE) {
-            NodeRegistrationRequest.TYPE_REGISTER -> {
+        when (request.type ?: NodeEventType.ONLINE) {
+            NodeEventType.ONLINE -> {
                 val nodeInfo = NodeInfo(
                     nodeId = request.nodeId,
-                    transport = request.transport ?: TransportType.AMQP,
-                    host = request.host ?: "unknown",
-                    port = request.port,
-                    authToken = request.authToken,
                     capabilities = request.capabilities ?: emptyMap(),
+                    transports = request.transports,
+                    resourceProviders = request.resourceProviders,
                     registeredAt = Instant.now()
                 )
                 nodeRegistry.register(nodeInfo)
                 LOG.info(
-                    "Node registered via AMQP: {} (timestamp={}, currentLoad={})",
-                    request.nodeId, request.timestamp, request.currentLoad
+                    "Node online via AMQP: {} (timestamp={})",
+                    request.nodeId, request.timestamp
                 )
 
                 sendReply(properties, NodeRegistrationResponse(
                     status = "registered",
                     nodeId = request.nodeId,
-                    orchestratorAuthToken = UUID.randomUUID().toString(),
                 ))
             }
 
-            NodeRegistrationRequest.TYPE_DEREGISTER -> {
-                nodeRegistry.deregister(request.nodeId)
-                LOG.info("Node deregistered via AMQP: {}", request.nodeId)
+            NodeEventType.OFFLINE -> {
+                val fullyRemoved = transportManager.handleTransportOffline(request.nodeId, TransportType.AMQP)
+                LOG.info("Node {} AMQP offline (fullyRemoved={})", request.nodeId, fullyRemoved)
 
                 sendReply(properties, NodeRegistrationResponse(
-                    status = "deregistered",
+                    status = if (fullyRemoved) "deregistered" else "transport_removed",
                     nodeId = request.nodeId,
                 ))
             }

@@ -1,7 +1,7 @@
 package com.nelos.parallel.adapters.http.controllers
 
-import com.nelos.parallel.commons.adapter.listener.TaskResultListener
-import com.nelos.parallel.commons.adapter.vo.TaskResult
+import com.nelos.parallel.commons.adapter.listener.TaskResultListenerRegistry
+import com.nelos.parallel.commons.adapter.vo.response.TaskResult
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity
@@ -16,20 +16,14 @@ import org.springframework.web.bind.annotation.RestController
  * @since %CURRENT_VERSION%
  */
 @RestController("prl.httpTaskResultCallbackController")
-class HttpTaskResultCallbackController {
-
-    @Autowired(required = false)
-    private var listeners: List<TaskResultListener> = emptyList()
+class HttpTaskResultCallbackController @Autowired constructor(
+    private val listenerRegistry: TaskResultListenerRegistry,
+) {
 
     @PutMapping("/api/callback/result")
     fun onResult(@RequestBody result: TaskResult): ResponseEntity<Void> {
         LOG.info("Received task result for job {} from node {}: {}", result.jobId, result.nodeId, result.status)
-
-        listeners.forEach { listener ->
-            runCatching { listener.onTaskResult(result) }
-                .onFailure { LOG.error("Error in task result listener: {}", it.message, it) }
-        }
-
+        listenerRegistry.dispatch(result)
         return ResponseEntity.ok().build()
     }
 

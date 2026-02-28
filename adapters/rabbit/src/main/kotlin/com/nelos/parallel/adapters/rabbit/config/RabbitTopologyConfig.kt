@@ -23,12 +23,12 @@ class RabbitTopologyConfig {
         FanoutExchange(RabbitConstants.NODE_FANOUT_EXCHANGE, true, false)
 
     @Bean
-    fun tasksCorrectnessQueue(): Queue =
-        QueueBuilder.durable(RabbitConstants.TASKS_CORRECTNESS_QUEUE).build()
+    fun nodeControlDirectExchange(): DirectExchange =
+        DirectExchange(RabbitConstants.NODE_CONTROL_EXCHANGE, true, false)
 
     @Bean
-    fun tasksPerformanceQueue(): Queue =
-        QueueBuilder.durable(RabbitConstants.TASKS_PERFORMANCE_QUEUE).build()
+    fun tasksQueue(): Queue =
+        QueueBuilder.durable(RabbitConstants.TASKS_QUEUE).build()
 
     @Bean
     fun resultsQueue(): Queue =
@@ -39,14 +39,19 @@ class RabbitTopologyConfig {
         QueueBuilder.durable(RabbitConstants.NODE_EVENTS_QUEUE).build()
 
     @Bean
-    fun correctnessBinding(tasksCorrectnessQueue: Queue, testDirectExchange: DirectExchange): Binding =
-        BindingBuilder.bind(tasksCorrectnessQueue).to(testDirectExchange)
+    fun correctnessBinding(tasksQueue: Queue, testDirectExchange: DirectExchange): Binding =
+        BindingBuilder.bind(tasksQueue).to(testDirectExchange)
             .with(RabbitConstants.ROUTING_KEY_CORRECTNESS)
 
     @Bean
-    fun performanceBinding(tasksPerformanceQueue: Queue, testDirectExchange: DirectExchange): Binding =
-        BindingBuilder.bind(tasksPerformanceQueue).to(testDirectExchange)
+    fun performanceBinding(tasksQueue: Queue, testDirectExchange: DirectExchange): Binding =
+        BindingBuilder.bind(tasksQueue).to(testDirectExchange)
             .with(RabbitConstants.ROUTING_KEY_PERFORMANCE)
+
+    @Bean
+    fun allBinding(tasksQueue: Queue, testDirectExchange: DirectExchange): Binding =
+        BindingBuilder.bind(tasksQueue).to(testDirectExchange)
+            .with(RabbitConstants.ROUTING_KEY_ALL)
 
     @Bean
     fun resultsBinding(resultsQueue: Queue, testDirectExchange: DirectExchange): Binding =

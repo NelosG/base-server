@@ -2,8 +2,8 @@ package com.nelos.parallel.adapters.rabbit.listener
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.nelos.parallel.adapters.rabbit.RabbitConstants
-import com.nelos.parallel.commons.adapter.listener.TaskResultListener
-import com.nelos.parallel.commons.adapter.vo.TaskResult
+import com.nelos.parallel.commons.adapter.listener.TaskResultListenerRegistry
+import com.nelos.parallel.commons.adapter.vo.response.TaskResult
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.rabbit.annotation.RabbitListener
 import org.springframework.beans.factory.annotation.Autowired
@@ -11,18 +11,16 @@ import org.springframework.stereotype.Component
 
 /**
  * Listens for task results on the [com.nelos.parallel.adapters.rabbit.RabbitConstants.RESULTS_QUEUE] and dispatches
- * them to registered [TaskResultListener] instances.
+ * them to the [TaskResultListenerRegistry].
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
 @Component("prl.rabbitResultListener")
 class RabbitResultListener @Autowired constructor(
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val listenerRegistry: TaskResultListenerRegistry,
 ) {
-
-    @Autowired(required = false)
-    private var listeners: List<TaskResultListener> = emptyList()
 
     @RabbitListener(queues = [RabbitConstants.RESULTS_QUEUE])
     fun onMessage(message: ByteArray) {
@@ -34,11 +32,7 @@ class RabbitResultListener @Autowired constructor(
                 result.nodeId,
                 result.status
             )
-
-            listeners.forEach { listener ->
-                runCatching { listener.onTaskResult(result) }
-                    .onFailure { LOG.error("Error in task result listener: {}", it.message, it) }
-            }
+            listenerRegistry.dispatch(result)
         } catch (e: Exception) {
             LOG.error("Failed to deserialize task result message: {}", e.message, e)
         }
