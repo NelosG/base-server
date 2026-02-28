@@ -1,4 +1,4 @@
-package com.nelos.parallel.commons.adapter.vo
+package com.nelos.parallel.commons.adapter.vo.response
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
@@ -6,15 +6,16 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 
 /**
- * Information about an adapter on a test-runner node.
+ * Aggregate performance metrics for a scenario.
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-class AdapterInfo @JsonCreator constructor(
-    @param:JsonProperty("name") val name: String,
-    @param:JsonProperty("status") val status: String? = null,
-    @param:JsonProperty("dllPath") val dllPath: String? = null,
+class ScenarioMetrics @JsonCreator constructor(
+    @param:JsonProperty("t1Ms") val t1Ms: Double,
+    @param:JsonProperty("tpMs") val tpMs: Double,
+    @param:JsonProperty("speedup") val speedup: Double,
+    @param:JsonProperty("efficiency") val efficiency: Double,
 )

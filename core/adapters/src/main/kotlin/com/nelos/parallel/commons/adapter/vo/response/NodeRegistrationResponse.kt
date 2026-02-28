@@ -1,4 +1,4 @@
-package com.nelos.parallel.commons.adapter.vo
+package com.nelos.parallel.commons.adapter.vo.response
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
@@ -17,6 +17,5 @@ import java.time.Instant
 class NodeRegistrationResponse @JsonCreator constructor(
     @param:JsonProperty("status") val status: String,
     @param:JsonProperty("nodeId") val nodeId: String,
-    @param:JsonProperty("orchestratorAuthToken") val orchestratorAuthToken: String? = null,
     @param:JsonProperty("timestamp") val timestamp: Instant = Instant.now()
 )

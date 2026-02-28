@@ -1,4 +1,4 @@
-package com.nelos.parallel.commons.adapter.vo
+package com.nelos.parallel.commons.adapter.vo.response
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
@@ -23,6 +23,12 @@ class QueueStatus @JsonCreator constructor(
     @param:JsonProperty("activeCorrectness") private val activeCorrectness: Int? = null,
     @param:JsonProperty("performanceQueueSize") private val performanceQueueSize: Int? = null,
     @param:JsonProperty("perfRunning") private val perfRunning: Boolean? = null,
+    @param:JsonProperty("status") val status: String? = null,
+    @param:JsonProperty("maxCorrectnessWorkers") val maxCorrectnessWorkers: Int? = null,
+    @param:JsonProperty("maxOmpThreads") val maxOmpThreads: Int? = null,
+    @param:JsonProperty("currentPerfJob") val currentPerfJob: String? = null,
+    @param:JsonProperty("jobRetentionSeconds") val jobRetentionSeconds: Int? = null,
+    @param:JsonProperty("defaultMemoryLimitMb") val defaultMemoryLimitMb: Long? = null,
 ) {
 
     fun effectiveCorrectnessQueue(): QueueInfo? =
