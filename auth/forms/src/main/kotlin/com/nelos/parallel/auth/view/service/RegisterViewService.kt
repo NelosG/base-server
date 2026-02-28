@@ -4,6 +4,7 @@ import com.nelos.parallel.auth.service.AuthService
 import com.nelos.parallel.auth.service.UserDetailsProviderService
 import com.nelos.parallel.auth.vo.SignData
 import com.nelos.parallel.commons.view.service.ViewService
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 
 /**
@@ -21,8 +22,8 @@ class RegisterViewService(
     /**
      * Registers a new user with the provided [data], authenticates them, and returns a success indicator.
      */
-    fun signUp(data: SignData, response: HttpServletResponse) {
+    fun signUp(data: SignData, request: HttpServletRequest, response: HttpServletResponse) {
         userService.signUp(data)
-        authService.authenticate(data, response)
+        authService.authenticate(data, request, response)
     }
 }

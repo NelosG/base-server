@@ -16,6 +16,12 @@
     <dependencies>
 
         <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-core-commons</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-webmvc</artifactId>
         </dependency>

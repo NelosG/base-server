@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.core.AuthenticationException
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken
 import org.springframework.web.filter.OncePerRequestFilter
@@ -36,7 +37,8 @@ class JwtAuthFilter(
                 details = WebAuthenticationDetailsSource().buildDetails(request)
             }
             try {
-                authenticationManager.authenticate(authenticationToken)
+                val authenticated = authenticationManager.authenticate(authenticationToken)
+                SecurityContextHolder.getContext().authentication = authenticated
             } catch (e: AuthenticationException) {
                 LOG.debug("JWT authentication failed for request {}: {}", request.requestURI, e.message)
             }

@@ -8,7 +8,6 @@ import org.springframework.security.authentication.AuthenticationProvider
 import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
-import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken
 import org.springframework.stereotype.Component
 
@@ -39,9 +38,7 @@ class JwtAuthenticationProvider @Autowired constructor(
         }
         val user = userDetailsService.loadUserByUsername(login)
 
-        val authenticationToken = UsernamePasswordAuthenticationToken(user, null, user.authorities)
-        SecurityContextHolder.getContext().authentication = authenticationToken
-        return authenticationToken
+        return UsernamePasswordAuthenticationToken(user, null, user.authorities)
     }
 
     override fun supports(authentication: Class<*>): Boolean {

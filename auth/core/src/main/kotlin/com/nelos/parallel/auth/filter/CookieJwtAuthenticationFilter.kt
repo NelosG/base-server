@@ -34,7 +34,8 @@ class CookieJwtAuthenticationFilter(
             }
 
             try {
-                authenticationManager.authenticate(authenticationToken)
+                val authenticated = authenticationManager.authenticate(authenticationToken)
+                SecurityContextHolder.getContext().authentication = authenticated
             } catch (e: AuthenticationException) {
                 LOG.debug("Cookie JWT authentication failed for request {}: {}", request.requestURI, e.message)
             }

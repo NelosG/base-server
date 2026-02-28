@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service
  *
  * @property value the Spring bean name (aliased to [org.springframework.stereotype.Service.value])
  * @property public if `true`, the service is accessible without authentication
+ * @property roles if non-empty, only users with at least one of the specified roles may invoke this service
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
@@ -18,4 +19,5 @@ annotation class ViewService(
     @get:AliasFor(annotation = Service::class)
     val value: String = "",
     val public: Boolean = false,
+    val roles: Array<String> = [],
 )

@@ -97,7 +97,7 @@ const ViewEngine = {
         document.querySelectorAll("[data-url-href]").forEach(function (el) {
             var paramName = el.getAttribute("data-url-href");
             var value = params.get(paramName);
-            if (value !== null) {
+            if (value !== null && value.startsWith("/") && !value.startsWith("//")) {
                 el.href = value;
             }
         });

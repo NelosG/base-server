@@ -3,9 +3,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     var links = [
         {href: "/admin", label: "Admin", icon: "bi-shield-lock", role: "ADMIN"},
+        {href: "/api-keys", label: "API Keys", icon: "bi-key", role: "ADMIN"},
         {href: "/settings", label: "Settings", icon: "bi-gear"},
-        {href: "/adapter-http-test", label: "HTTP Test", icon: "bi-globe"},
-        {href: "/adapter-rabbit-test", label: "AMQP Test", icon: "bi-envelope"},
+        {href: "/adapter-http-test", label: "HTTP Test", icon: "bi-globe", role: "ADMIN"},
+        {href: "/adapter-rabbit-test", label: "AMQP Test", icon: "bi-envelope", role: "ADMIN"},
     ];
 
     var nav = document.createElement("nav");
@@ -72,7 +73,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     document.body.insertBefore(nav, document.body.firstChild);
 
-    if (path === "/admin") {
+    var isRolePage = links.some(function (link) {
+        return link.role && path === link.href;
+    });
+    if (isRolePage) {
         nav.querySelectorAll("[data-navbar-role]").forEach(function (el) {
             el.style.display = "";
         });

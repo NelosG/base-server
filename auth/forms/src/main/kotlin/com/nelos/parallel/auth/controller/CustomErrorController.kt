@@ -35,18 +35,22 @@ class CustomErrorController : ErrorController {
     @RequestMapping("/error")
     fun handleError(request: HttpServletRequest, response: HttpServletResponse): String {
         val status = getHttpStatus(request, response).value()
-        val message = getErrorMessage(status, request).urlEncode()
+        val message = getErrorMessage(status).urlEncode()
         val path = ((request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI) as? String) ?: "").urlEncode()
         val referer = (request.getHeader("Referer") ?: "/").urlEncode()
         return "redirect:/error-page?status=$status&message=$message&path=$path&referer=$referer"
     }
 
-    private fun getErrorMessage(status: Int, request: HttpServletRequest): String {
-        val exception = request.getAttribute(ERROR_EXCEPTION) as? Exception
-        return exception?.message ?: when (status) {
-            404 -> "Page not found"
+    private fun getErrorMessage(status: Int): String {
+        return when (status) {
+            400 -> "Bad request"
+            401 -> "Unauthorized"
             403 -> "Access denied"
+            404 -> "Page not found"
+            405 -> "Method not allowed"
             500 -> "Internal server error"
+            502 -> "Bad gateway"
+            503 -> "Service unavailable"
             else -> "An error occurred"
         }
     }

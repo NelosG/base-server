@@ -2,6 +2,7 @@ package com.nelos.parallel.auth.enums
 
 import com.nelos.parallel.commons.entity.enums.JpaEnum
 import com.nelos.parallel.commons.entity.enums.JpaEnumConverter
+import com.nelos.parallel.commons.security.AppRole
 import jakarta.persistence.Converter
 
 /**
@@ -12,14 +13,14 @@ enum class UserType(private val dbKey: String, private val roles: List<String>) 
     USER(
         "US",
         listOf(
-            "ROLE_USER",
+            AppRole.ROLE_USER,
         ),
     ),
     ADMIN(
         "AD",
         listOf(
-            "ROLE_ADMIN",
-            "ROLE_USER",
+            AppRole.ROLE_ADMIN,
+            AppRole.ROLE_USER,
         ),
     );
 

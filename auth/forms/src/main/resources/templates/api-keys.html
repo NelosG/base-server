@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark" lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <title>API Keys</title>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
+        <script src="/js/navbar.js"></script>
+    </head>
+    <body>
+
+        <div class="container mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="mb-0"><i class="bi bi-key"></i> API Keys</h3>
+                <button class="btn btn-primary" id="btn-show-create">
+                    <i class="bi bi-plus-lg"></i> Create Key
+                </button>
+            </div>
+
+            <!-- Create Key Section (hidden by default) -->
+            <div class="card mb-4 d-none" id="create-section">
+                <div class="card-body">
+                    <div class="row align-items-end">
+                        <div class="col-md-8">
+                            <label class="form-label" for="key-name">Key Name</label>
+                            <input class="form-control" id="key-name"
+                                   placeholder="e.g. test-runner-prod" type="text">
+                        </div>
+                        <div class="col-md-4 mt-2 mt-md-0">
+                            <button class="btn btn-success w-100" id="btn-create">
+                                <i class="bi bi-plus-circle"></i> Create
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Raw Key Alert (shown once after creation) -->
+            <div class="alert alert-warning d-none" id="raw-key-alert">
+                <h6 class="alert-heading"><i class="bi bi-exclamation-triangle"></i> Save this key now!</h6>
+                <p class="mb-2">This key will only be shown once. Copy it before closing this alert.</p>
+                <div class="input-group mb-2">
+                    <input class="form-control font-monospace" id="raw-key-value" readonly type="text">
+                    <button class="btn btn-outline-secondary" id="btn-copy-key" type="button">
+                        <i class="bi bi-clipboard"></i> Copy
+                    </button>
+                </div>
+                <button class="btn btn-sm btn-outline-warning" id="btn-dismiss-key">Dismiss</button>
+            </div>
+
+            <!-- Keys Table -->
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="text-center p-4 d-none" id="keys-loading">
+                        <div class="spinner-border text-primary" role="status"></div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="keys-table">
+                            <thead>
+                                <tr>
+                                    <th>Prefix</th>
+                                    <th>Name</th>
+                                    <th>Active</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="keys-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-center text-muted p-3 d-none" id="keys-empty">
+                        No API keys yet.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            var SVC = "prl.apiKeyViewService";
+
+            function loadKeys() {
+                var loading = document.getElementById("keys-loading");
+                var tbody = document.getElementById("keys-tbody");
+                var empty = document.getElementById("keys-empty");
+
+                loading.classList.remove("d-none");
+                tbody.innerHTML = "";
+                empty.classList.add("d-none");
+
+                ViewEngine.call(SVC, "getApiKeys", []).then(function (keys) {
+                    loading.classList.add("d-none");
+                    if (!keys || keys.length === 0) {
+                        empty.classList.remove("d-none");
+                        return;
+                    }
+                    keys.forEach(function (key) {
+                        var tr = document.createElement("tr");
+                        tr.innerHTML =
+                            "<td><code>" + escapeHtml(key.keyPrefix) + "...</code></td>" +
+                            "<td>" + escapeHtml(key.name) + "</td>" +
+                            "<td>" + (key.active
+                                ? "<span class='badge bg-success'>Active</span>"
+                                : "<span class='badge bg-secondary'>Inactive</span>") + "</td>" +
+                            "<td>" + formatDate(key.createdAt) + "</td>" +
+                            "<td><button class='btn btn-sm btn-outline-danger btn-delete' data-id='" + key.id + "'>" +
+                                "<i class='bi bi-trash'></i></button></td>";
+                        tbody.appendChild(tr);
+                    });
+                    bindDeleteButtons();
+                }).catch(function (err) {
+                    loading.classList.add("d-none");
+                    console.error("Failed to load API keys", err);
+                });
+            }
+
+            function bindDeleteButtons() {
+                document.querySelectorAll(".btn-delete").forEach(function (btn) {
+                    btn.addEventListener("click", function () {
+                        var id = parseInt(this.getAttribute("data-id"));
+                        if (!confirm("Delete this API key?")) return;
+                        ViewEngine.call(SVC, "deleteApiKey", [{id: id}]).then(function () {
+                            loadKeys();
+                        }).catch(function (err) {
+                            console.error("Failed to delete API key", err);
+                        });
+                    });
+                });
+            }
+
+            function escapeHtml(str) {
+                var div = document.createElement("div");
+                div.textContent = str || "";
+                return div.innerHTML;
+            }
+
+            function formatDate(iso) {
+                if (!iso) return "";
+                try {
+                    return new Date(iso).toLocaleString();
+                } catch (e) {
+                    return iso;
+                }
+            }
+
+            document.getElementById("btn-show-create").addEventListener("click", function () {
+                var section = document.getElementById("create-section");
+                section.classList.toggle("d-none");
+                if (!section.classList.contains("d-none")) {
+                    document.getElementById("key-name").focus();
+                }
+            });
+
+            document.getElementById("btn-create").addEventListener("click", function () {
+                var name = document.getElementById("key-name").value.trim();
+                if (!name) {
+                    document.getElementById("key-name").focus();
+                    return;
+                }
+
+                ViewEngine.call(SVC, "createApiKey", [{name: name}]).then(function (resp) {
+                    document.getElementById("key-name").value = "";
+                    document.getElementById("create-section").classList.add("d-none");
+
+                    var alert = document.getElementById("raw-key-alert");
+                    document.getElementById("raw-key-value").value = resp.rawKey;
+                    alert.classList.remove("d-none");
+
+                    loadKeys();
+                }).catch(function (err) {
+                    console.error("Failed to create API key", err);
+                });
+            });
+
+            document.getElementById("btn-copy-key").addEventListener("click", function () {
+                var input = document.getElementById("raw-key-value");
+                input.select();
+                navigator.clipboard.writeText(input.value);
+            });
+
+            document.getElementById("btn-dismiss-key").addEventListener("click", function () {
+                document.getElementById("raw-key-alert").classList.add("d-none");
+                document.getElementById("raw-key-value").value = "";
+            });
+
+            document.addEventListener("DOMContentLoaded", function () {
+                loadKeys();
+            });
+        </script>
+    </body>
+</html>
