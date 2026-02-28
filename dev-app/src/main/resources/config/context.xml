@@ -45,6 +45,7 @@
 
     <bean id="prl.httpNodeAdapter" class="com.nelos.parallel.adapters.http.impl.HttpNodeAdapterImpl">
         <constructor-arg ref="prl.nodeRestClient"/>
+        <constructor-arg ref="jacksonObjectMapper"/>
     </bean>
 
     <rabbit:connection-factory id="rabbitConnectionFactory"
@@ -54,17 +55,29 @@
                                password="${rabbitmq.password:guest}"
                                virtual-host="${rabbitmq.vhost:/}"/>
 
-    <rabbit:template id="prl.rabbitTemplate" connection-factory="rabbitConnectionFactory"/>
+    <rabbit:template id="prl.rabbitTemplate" connection-factory="rabbitConnectionFactory"
+                     reply-timeout="${rabbitmq.reply-timeout:30000}"/>
 
     <rabbit:admin id="prl.rabbitAdmin" connection-factory="rabbitConnectionFactory"/>
 
     <bean id="prl.rabbitNodeAdapter" class="com.nelos.parallel.adapters.rabbit.impl.RabbitNodeAdapterImpl">
         <constructor-arg ref="prl.rabbitTemplate"/>
+        <constructor-arg ref="jacksonObjectMapper"/>
+    </bean>
+
+    <bean id="prl.nodeAdapterRegistry" class="com.nelos.parallel.commons.adapter.impl.InMemoryNodeAdapterRegistry">
         <constructor-arg>
-            <bean class="com.fasterxml.jackson.databind.ObjectMapper"/>
+            <list>
+                <ref bean="prl.httpNodeAdapter"/>
+                <ref bean="prl.rabbitNodeAdapter"/>
+            </list>
         </constructor-arg>
     </bean>
 
+    <bean id="prl.nodeTransportManager" class="com.nelos.parallel.commons.adapter.NodeTransportManager">
+        <constructor-arg ref="prl.inMemoryNodeRegistry"/>
+        <constructor-arg ref="prl.nodeAdapterRegistry"/>
+    </bean>
 
     <rabbit:annotation-driven/>
 

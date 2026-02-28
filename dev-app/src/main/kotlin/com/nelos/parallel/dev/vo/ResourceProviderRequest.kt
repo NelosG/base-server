@@ -1,4 +1,4 @@
-package com.nelos.parallel.dev.view.vo
+package com.nelos.parallel.dev.vo
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
@@ -6,15 +6,15 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 
 /**
- * View object representing the result of a job cancellation.
+ * Request object for loading or unloading a resource provider on a node.
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-class CancelJobView @JsonCreator constructor(
-    @param:JsonProperty("jobId") val jobId: String,
-    @param:JsonProperty("status") val status: String,
-    @param:JsonProperty("error") val error: String? = null,
+class ResourceProviderRequest @JsonCreator constructor(
+    @param:JsonProperty("nodeId") val nodeId: String? = null,
+    @param:JsonProperty("providerName") val providerName: String? = null,
+    @param:JsonProperty("config") val config: String? = null,
 )

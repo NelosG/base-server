@@ -6,15 +6,15 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 
 /**
- * View object representing the result of a job cancellation.
+ * View object representing the result of a resource provider load/unload action.
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-class CancelJobView @JsonCreator constructor(
-    @param:JsonProperty("jobId") val jobId: String,
+class ResourceProviderActionView @JsonCreator constructor(
+    @param:JsonProperty("provider") val provider: String,
     @param:JsonProperty("status") val status: String,
-    @param:JsonProperty("error") val error: String? = null,
+    @param:JsonProperty("error") val error: String?,
 )

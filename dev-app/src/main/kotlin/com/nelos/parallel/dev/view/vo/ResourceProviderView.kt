@@ -8,17 +8,16 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.nelos.parallel.commons.adapter.enums.AdapterStatus
 
 /**
- * View object representing an adapter on a test-runner node.
+ * View object representing a resource provider on a test-runner node.
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-class AdapterView @JsonCreator constructor(
+class ResourceProviderView @JsonCreator constructor(
     @param:JsonProperty("name") val name: String,
     @param:JsonProperty("status") val status: AdapterStatus?,
     @param:JsonProperty("dllPath") val dllPath: String?,
-    @param:JsonProperty("type") val type: String? = null,
     @param:JsonProperty("config") val config: ObjectNode? = null,
 )
