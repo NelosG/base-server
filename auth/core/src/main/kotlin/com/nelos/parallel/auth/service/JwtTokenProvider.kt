@@ -7,8 +7,7 @@ import com.nelos.parallel.auth.vo.UserData
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 
 /**
  * Provides JWT token generation and validation.
@@ -49,10 +48,10 @@ class JwtTokenProvider(
     }
 
     companion object {
-        const val EXPIRATION_IN_DAYS = 30
+        const val EXPIRATION_IN_DAYS = 7
 
         private fun genAccessExpirationDate(): Instant {
-            return LocalDateTime.now().plusDays(EXPIRATION_IN_DAYS.toLong()).toInstant(ZoneOffset.UTC)
+            return Instant.now().plus(EXPIRATION_IN_DAYS.toLong(), ChronoUnit.DAYS)
         }
     }
 }

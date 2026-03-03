@@ -1,9 +1,11 @@
 package com.nelos.parallel.commons.view
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.nelos.parallel.commons.security.AppRole
 import com.nelos.parallel.commons.view.service.ViewService
 import com.nelos.parallel.commons.view.vo.ViewRequest
 import com.nelos.parallel.commons.view.vo.ViewResponse
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -32,7 +34,11 @@ class ViewEngineController @Autowired constructor(
      * Invokes the method specified in [request] on the target view service bean.
      */
     @PostMapping("/api/view/invoke")
-    fun invoke(@RequestBody request: ViewRequest, response: HttpServletResponse): ResponseEntity<ViewResponse> {
+    fun invoke(
+        @RequestBody request: ViewRequest,
+        httpRequest: HttpServletRequest,
+        response: HttpServletResponse,
+    ): ResponseEntity<ViewResponse> {
         return try {
             val bean = applicationContext.getBean(request.service)
 
@@ -45,20 +51,29 @@ class ViewEngineController @Autowired constructor(
                     .body(ViewResponse.error("Unauthorized"))
             }
 
+            if (annotation.roles.isNotEmpty()) {
+                val auth = SecurityContextHolder.getContext().authentication
+                val userRoles = auth?.authorities?.map { it.authority } ?: emptyList()
+                if (annotation.roles.none { "${AppRole.PREFIX}$it" in userRoles }) {
+                    return ResponseEntity.status(403)
+                        .body(ViewResponse.error("Forbidden"))
+                }
+            }
+
             val args = request.args ?: emptyList()
 
             val method = bean::class.java.methods.firstOrNull {
                 it.name == request.method &&
-                        it.parameterTypes.count { p -> p != HttpServletResponse::class.java } == args.size
+                        it.parameterTypes.count { p -> p !in INJECTED_TYPES } == args.size
             } ?: return ResponseEntity.badRequest()
                 .body(ViewResponse.error("Method '${request.method}' with ${args.size} argument(s) not found"))
 
             val argIterator = args.iterator()
             val convertedArgs = method.parameterTypes.map { paramType ->
-                if (paramType == HttpServletResponse::class.java) {
-                    response
-                } else {
-                    argIterator.next()?.let { objectMapper.convertValue(it, paramType) }
+                when (paramType) {
+                    HttpServletRequest::class.java -> httpRequest
+                    HttpServletResponse::class.java -> response
+                    else -> argIterator.next()?.let { objectMapper.convertValue(it, paramType) }
                 }
             }.toTypedArray()
 
@@ -84,5 +99,6 @@ class ViewEngineController @Autowired constructor(
 
     companion object {
         private val LOG = LoggerFactory.getLogger(ViewEngineController::class.java)
+        private val INJECTED_TYPES = setOf(HttpServletRequest::class.java, HttpServletResponse::class.java)
     }
 }

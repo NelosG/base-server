@@ -3,6 +3,7 @@ package com.nelos.parallel.auth.view.service
 import com.nelos.parallel.auth.service.UserDetailsProviderService
 import com.nelos.parallel.auth.view.vo.UserView
 import com.nelos.parallel.auth.vo.SignData
+import com.nelos.parallel.commons.security.AppRole
 import com.nelos.parallel.commons.view.service.ViewService
 
 /**
@@ -11,7 +12,7 @@ import com.nelos.parallel.commons.view.service.ViewService
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
-@ViewService("prl.adminViewService")
+@ViewService("prl.adminViewService", roles = [AppRole.ADMIN])
 class AdminViewService(private val userService: UserDetailsProviderService) {
 
     /**

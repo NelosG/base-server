@@ -5,6 +5,7 @@ import com.nelos.parallel.auth.enums.UserType
 import com.nelos.parallel.auth.exceptions.UserAlreadyExistsException
 import com.nelos.parallel.auth.vo.SignData
 import com.nelos.parallel.auth.vo.UserData
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
@@ -46,6 +47,7 @@ class UserDetailsProviderService(
      */
     fun signUp(data: SignData, isAdmin: Boolean = false): User {
         val login = data.login ?: error("Login can't be null")
+        val password = data.password ?: error("Password can't be null")
 
         if (repository.findByLogin(login) != null) {
             throw UserAlreadyExistsException("User with login $login already exists")
@@ -53,12 +55,16 @@ class UserDetailsProviderService(
 
         val type = if (isAdmin) UserType.ADMIN else UserType.USER
 
-        return repository.save(
-            User().apply {
-                this.login = login
-                this.encryptedPassword = BCryptPasswordEncoder().encode(data.password)
-                this.type = type
-            }
-        )
+        return try {
+            repository.save(
+                User().apply {
+                    this.login = login
+                    this.encryptedPassword = BCryptPasswordEncoder().encode(password)
+                    this.type = type
+                }
+            )
+        } catch (_: DataIntegrityViolationException) {
+            throw UserAlreadyExistsException("User with login $login already exists")
+        }
     }
 }
