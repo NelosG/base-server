@@ -1,11 +1,14 @@
 package com.nelos.parallel.adapters.rabbit.impl
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ObjectNode
 import com.nelos.parallel.adapters.rabbit.RabbitConstants
 import com.nelos.parallel.adapters.rabbit.RabbitNodeAdapter
 import com.nelos.parallel.adapters.rabbit.exceptions.RabbitAdapterException
 import com.nelos.parallel.commons.adapter.enums.TransportType
-import com.nelos.parallel.commons.adapter.vo.*
+import com.nelos.parallel.commons.adapter.vo.NodeInfo
+import com.nelos.parallel.commons.adapter.vo.request.*
+import com.nelos.parallel.commons.adapter.vo.response.*
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.core.Message
 import org.springframework.amqp.core.MessageProperties
@@ -27,7 +30,7 @@ class RabbitNodeAdapterImpl(
 
     override fun submitTask(node: NodeInfo, task: TaskSubmission): TaskSubmissionResponse =
         adapterCall("Failed to submit task via AMQP to node ${node.nodeId}") {
-            val routingKey = task.mode ?: "correctness"
+            val routingKey = task.mode?.toValue() ?: RabbitConstants.ROUTING_KEY_CORRECTNESS
             val message = jsonMessage(task) {
                 setHeader("nodeId", node.nodeId)
             }
@@ -47,14 +50,10 @@ class RabbitNodeAdapterImpl(
             objectMapper.readValue(response, TaskResult::class.java)
         }
 
-    override fun cancelJob(node: NodeInfo, jobId: String): Boolean =
-        try {
+    override fun cancelJob(node: NodeInfo, jobId: String): CancelJobResponse =
+        adapterCall("Failed to cancel job $jobId on node ${node.nodeId}") {
             val response = sendControlMessage("cancelJob", node.nodeId, "jobId" to jobId)
-            val tree = objectMapper.readTree(response)
-            tree.path("status").asText() == "cancelled"
-        } catch (e: Exception) {
-            LOG.warn("Failed to cancel job {} on node {}: {}", jobId, node.nodeId, e.message)
-            false
+            objectMapper.readValue(response, CancelJobResponse::class.java)
         }
 
     override fun queryNodeStatus(node: NodeInfo): NodeStatus =
@@ -99,11 +98,11 @@ class RabbitNodeAdapterImpl(
             )
         }
 
-    override fun loadAdapter(node: NodeInfo, name: String, config: Map<String, Any?>?): AdapterActionResult =
+    override fun loadAdapter(node: NodeInfo, name: String, config: ObjectNode?): AdapterActionResult =
         adapterCall("Failed to load adapter '$name' on node ${node.nodeId}") {
             val response = sendControlMessage(
                 "loadAdapter", node.nodeId,
-                "adapter" to name, "config" to (config ?: emptyMap<String, Any?>())
+                "adapter" to name, "config" to (config ?: objectMapper.createObjectNode())
             )
             objectMapper.readValue(response, AdapterActionResult::class.java)
         }
@@ -112,6 +111,49 @@ class RabbitNodeAdapterImpl(
         adapterCall("Failed to unload adapter '$name' from node ${node.nodeId}") {
             val response = sendControlMessage("unloadAdapter", node.nodeId, "adapter" to name)
             objectMapper.readValue(response, AdapterActionResult::class.java)
+        }
+
+    override fun updateConfig(node: NodeInfo, config: ConfigUpdateRequest): QueueStatus =
+        adapterCall("Failed to update config on node ${node.nodeId}") {
+            val configMap = buildMap<String, Any?> {
+                config.maxCorrectnessWorkers?.let { put("maxCorrectnessWorkers", it) }
+                config.jobRetentionSeconds?.let { put("jobRetentionSeconds", it) }
+            }
+            val response = sendControlMessage("updateConfig", node.nodeId, "config" to configMap)
+            objectMapper.readValue(response, QueueStatus::class.java)
+        }
+
+    override fun listResourceProviders(node: NodeInfo): List<ResourceProviderInfo> =
+        fetchProviderList("listResourceProviders", node.nodeId)
+
+    override fun listAvailableResourceProviders(node: NodeInfo): List<ResourceProviderInfo> =
+        fetchProviderList("listAvailableResourceProviders", node.nodeId)
+
+    private fun fetchProviderList(command: String, nodeId: String): List<ResourceProviderInfo> =
+        adapterCall("Failed to $command on node $nodeId") {
+            val response = sendControlMessage(command, nodeId)
+            val tree = objectMapper.readTree(response)
+            val providers = tree.get("providers")
+                ?: throw RabbitAdapterException("Missing 'providers' field in response")
+            objectMapper.readValue(
+                providers.traverse(),
+                objectMapper.typeFactory.constructCollectionType(List::class.java, ResourceProviderInfo::class.java)
+            )
+        }
+
+    override fun loadResourceProvider(node: NodeInfo, name: String, config: ObjectNode?): ResourceProviderActionResult =
+        adapterCall("Failed to load resource provider '$name' on node ${node.nodeId}") {
+            val response = sendControlMessage(
+                "loadResourceProvider", node.nodeId,
+                "provider" to name, "config" to (config ?: objectMapper.createObjectNode())
+            )
+            objectMapper.readValue(response, ResourceProviderActionResult::class.java)
+        }
+
+    override fun unloadResourceProvider(node: NodeInfo, name: String): ResourceProviderActionResult =
+        adapterCall("Failed to unload resource provider '$name' from node ${node.nodeId}") {
+            val response = sendControlMessage("unloadResourceProvider", node.nodeId, "provider" to name)
+            objectMapper.readValue(response, ResourceProviderActionResult::class.java)
         }
 
     private fun sendControlMessage(
@@ -126,7 +168,7 @@ class RabbitNodeAdapterImpl(
         }
 
         val response = rabbitTemplate.sendAndReceive(
-            RabbitConstants.NODE_FANOUT_EXCHANGE, "", jsonMessage(request)
+            RabbitConstants.NODE_CONTROL_EXCHANGE, nodeId, jsonMessage(request)
         )
 
         return response?.body
