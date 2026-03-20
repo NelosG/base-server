@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.nelos.parallel.commons.adapter.enums.AdapterStatus
 
 /**
  * @author gpushkarev
@@ -13,6 +15,8 @@ import com.fasterxml.jackson.annotation.JsonProperty
 @JsonIgnoreProperties(ignoreUnknown = true)
 class AdapterView @JsonCreator constructor(
     @param:JsonProperty("name") val name: String,
-    @param:JsonProperty("status") val status: String?,
+    @param:JsonProperty("status") val status: AdapterStatus?,
     @param:JsonProperty("dllPath") val dllPath: String?,
+    @param:JsonProperty("type") val type: String? = null,
+    @param:JsonProperty("config") val config: ObjectNode? = null,
 )

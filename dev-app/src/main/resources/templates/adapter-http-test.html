@@ -8,6 +8,7 @@
         <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
         <link href="/css/main.css" rel="stylesheet"/>
         <link href="/webjars/highlightjs/11.11.1/styles/atom-one-dark.min.css" rel="stylesheet"/>
+        <script src="/webjars/bootstrap/5.3.8/js/bootstrap.bundle.min.js"></script>
         <script src="/js/view-engine.js"></script>
         <script src="/js/navbar.js"></script>
         <script src="/webjars/highlightjs/11.11.1/highlight.min.js"></script>
@@ -39,9 +40,8 @@
                         <thead>
                             <tr>
                                 <th>Node ID</th>
-                                <th>Host</th>
-                                <th>Port</th>
                                 <th>Capabilities</th>
+                                <th>Transports</th>
                                 <th>Registered</th>
                                 <th>Actions</th>
                             </tr>
@@ -84,15 +84,26 @@
                                 <button class="btn btn-outline-secondary" onclick="AdapterTestCommon.doListAvailable()">
                                     <i class="bi bi-box-seam"></i> Available Adapters
                                 </button>
+                                <button class="btn btn-outline-secondary" onclick="AdapterTestCommon.doListProviders()">
+                                    <i class="bi bi-archive"></i> List Providers
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="AdapterTestCommon.doListAvailableProviders()">
+                                    <i class="bi bi-archive-fill"></i> Available Providers
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Adapter Management -->
+                <!-- Adapter Management + Resource Provider Management -->
                 <div class="col-md-6">
                     <div class="card">
-                        <div class="card-header"><i class="bi bi-plug"></i> Adapter Management</div>
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-plug"></i> Adapter Management</span>
+                                <button class="btn btn-sm btn-outline-light" onclick="AdapterTestCommon.refreshAdapters()">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                            </div>
                         <div class="card-body">
                             <div class="mb-3">
                                 <label class="form-label">Adapter Name</label>
@@ -100,22 +111,89 @@
                                     <option value="">-- select a node first --</option>
                                 </select>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">Config JSON</label>
-                                <textarea class="form-control font-mono" id="adapter-config"
-                                          rows="1" placeholder='{}'></textarea>
-                                <small class="text-muted">Optional configuration object</small>
-                            </div>
-                            <div class="btn-group w-100">
-                                <button class="btn btn-success" onclick="AdapterTestCommon.doLoadAdapter()">
+                            <div id="adapter-load-section" style="display:none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Config JSON</label>
+                                    <textarea class="form-control font-mono" id="adapter-config"
+                                              rows="1" placeholder='{}'></textarea>
+                                    <small class="text-muted">Optional configuration object</small>
+                                </div>
+                                <button class="btn btn-success w-100" onclick="AdapterTestCommon.doLoadAdapter()">
                                     <i class="bi bi-plus-circle"></i> Load
                                 </button>
-                                <button class="btn btn-warning" onclick="AdapterTestCommon.doUnloadAdapter()">
+                            </div>
+                            <div id="adapter-unload-section" style="display:none;">
+                                <div class="mb-3" id="adapter-config-display" style="display:none;">
+                                    <label class="form-label text-muted">Current Config</label>
+                                    <pre id="adapter-running-config" class="prl-config-display"></pre>
+                                </div>
+                                <button class="btn btn-warning w-100" onclick="AdapterTestCommon.doUnloadAdapter()">
                                     <i class="bi bi-dash-circle"></i> Unload
                                 </button>
                             </div>
                         </div>
                     </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-archive"></i> Resource Provider Management</span>
+                            <button class="btn btn-sm btn-outline-light" onclick="AdapterTestCommon.refreshProviders()">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Provider Name</label>
+                                <select class="form-select" id="provider-name">
+                                    <option value="">-- select a node first --</option>
+                                </select>
+                            </div>
+                            <div id="provider-load-section" style="display:none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Config JSON</label>
+                                    <textarea class="form-control font-mono" id="provider-config"
+                                              rows="1" placeholder='{}'></textarea>
+                                    <small class="text-muted">Optional configuration object</small>
+                                </div>
+                                <button class="btn btn-success w-100" onclick="AdapterTestCommon.doLoadProvider()">
+                                    <i class="bi bi-plus-circle"></i> Load
+                                </button>
+                            </div>
+                            <div id="provider-unload-section" style="display:none;">
+                                <div class="mb-3" id="provider-config-display" style="display:none;">
+                                    <label class="form-label text-muted">Current Config</label>
+                                    <pre id="provider-running-config" class="prl-config-display"></pre>
+                                </div>
+                                <button class="btn btn-warning w-100" onclick="AdapterTestCommon.doUnloadProvider()">
+                                    <i class="bi bi-dash-circle"></i> Unload
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Node Configuration -->
+            <div class="card mt-3">
+                <div class="card-header"><i class="bi bi-gear"></i> Node Configuration</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Max Correctness Workers</label>
+                            <input class="form-control" id="config-max-workers" type="number" placeholder="current value">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Job Retention (seconds)</label>
+                            <input class="form-control" id="config-retention" type="number" placeholder="current value">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Default Memory Limit (MB)</label>
+                            <input class="form-control" id="config-memory-limit" type="number" placeholder="current value">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="AdapterTestCommon.doUpdateConfig()">
+                        <i class="bi bi-save"></i> Update Config
+                    </button>
                 </div>
             </div>
 
@@ -148,20 +226,64 @@
                     </div>
                     <div class="row">
                         <div class="col-md-3 mb-3">
-                            <label class="form-label">Solution Git URL</label>
+                            <label class="form-label">Memory Limit (MB)</label>
+                            <input class="form-control" id="task-memory-limit" placeholder="server default" type="number">
+                        </div>
+                    </div>
+                    <!-- Solution Source -->
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Solution Source Type</label>
+                            <select class="form-select" id="task-solution-source-type"
+                                    onchange="AdapterTestCommon.onSourceTypeChange('solution')">
+                                <option value="">-- none --</option>
+                                <option value="git">Git</option>
+                                <option value="local">Local</option>
+                            </select>
+                        </div>
+                        <div class="source-solution-git col-md-3 mb-3" style="display:none;">
+                            <label class="form-label">Solution URL</label>
                             <input class="form-control" id="task-solution-url" placeholder="https://...">
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Solution Dir</label>
-                            <input class="form-control" id="task-solution-dir" placeholder="optional subdir">
+                        <div class="source-solution-git col-md-3 mb-3" style="display:none;">
+                            <label class="form-label">Solution Branch</label>
+                            <input class="form-control" id="task-solution-branch" placeholder="main">
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <label class="form-label">Tests Git URL</label>
-                            <input class="form-control" id="task-tests-url" placeholder="https://...">
+                        <div class="source-solution-git col-md-3 mb-3" style="display:none;">
+                            <label class="form-label">Solution Token</label>
+                            <input class="form-control" id="task-solution-token" placeholder="optional token">
                         </div>
+                        <div class="source-solution-local col-md-9 mb-3" style="display:none;">
+                            <label class="form-label">Solution Path</label>
+                            <input class="form-control" id="task-solution-path" placeholder="/abs/path/to/solution">
+                        </div>
+                    </div>
+                    <!-- Test Source -->
+                    <div class="row">
                         <div class="col-md-3 mb-3">
-                            <label class="form-label">Tests Dir</label>
-                            <input class="form-control" id="task-tests-dir" placeholder="optional subdir">
+                            <label class="form-label">Test Source Type</label>
+                            <select class="form-select" id="task-test-source-type"
+                                    onchange="AdapterTestCommon.onSourceTypeChange('test')">
+                                <option value="">-- none --</option>
+                                <option value="git">Git</option>
+                                <option value="local">Local</option>
+                            </select>
+                        </div>
+                        <div class="source-test-git col-md-3 mb-3" style="display:none;">
+                            <label class="form-label">Test URL</label>
+                            <input class="form-control" id="task-test-url" placeholder="https://...">
+                        </div>
+                        <div class="source-test-git col-md-3 mb-3" style="display:none;">
+                            <label class="form-label">Test Branch</label>
+                            <input class="form-control" id="task-test-branch" placeholder="main">
+                        </div>
+                        <div class="source-test-git col-md-3 mb-3" style="display:none;">
+                            <label class="form-label">Test Token</label>
+                            <input class="form-control" id="task-test-token" placeholder="optional token">
+                        </div>
+                        <div class="source-test-local col-md-9 mb-3" style="display:none;">
+                            <label class="form-label">Test Path</label>
+                            <input class="form-control" id="task-test-path" placeholder="/abs/path/to/tests">
                         </div>
                     </div>
                     <button class="btn btn-primary" onclick="AdapterTestCommon.doSubmitTask()">
@@ -206,6 +328,24 @@
                         <div class="prl-log-placeholder prl-empty-state">
                             <i class="bi bi-terminal"></i><span>Waiting for actions...</span>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Modal -->
+        <div class="modal fade" id="result-modal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Result</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <pre class="mb-0" style="white-space: pre-wrap; word-break: break-word;"></pre>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>

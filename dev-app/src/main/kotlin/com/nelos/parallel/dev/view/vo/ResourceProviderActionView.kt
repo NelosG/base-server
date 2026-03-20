@@ -11,8 +11,8 @@ import com.fasterxml.jackson.annotation.JsonProperty
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-class CancelJobView @JsonCreator constructor(
-    @param:JsonProperty("jobId") val jobId: String,
+class ResourceProviderActionView @JsonCreator constructor(
+    @param:JsonProperty("provider") val provider: String,
     @param:JsonProperty("status") val status: String,
-    @param:JsonProperty("error") val error: String? = null,
+    @param:JsonProperty("error") val error: String?,
 )

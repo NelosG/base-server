@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.nelos.parallel.commons.adapter.enums.AdapterStatus
 
 /**
  * @author gpushkarev
@@ -11,8 +13,9 @@ import com.fasterxml.jackson.annotation.JsonProperty
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-class CancelJobView @JsonCreator constructor(
-    @param:JsonProperty("jobId") val jobId: String,
-    @param:JsonProperty("status") val status: String,
-    @param:JsonProperty("error") val error: String? = null,
+class ResourceProviderView @JsonCreator constructor(
+    @param:JsonProperty("name") val name: String,
+    @param:JsonProperty("status") val status: AdapterStatus?,
+    @param:JsonProperty("dllPath") val dllPath: String?,
+    @param:JsonProperty("config") val config: ObjectNode? = null,
 )
