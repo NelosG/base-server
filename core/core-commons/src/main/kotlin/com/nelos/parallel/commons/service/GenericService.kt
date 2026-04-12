@@ -2,7 +2,6 @@ package com.nelos.parallel.commons.service
 
 import com.nelos.parallel.commons.entity.AbstractEntity
 import com.nelos.parallel.commons.service.exceptions.ServiceException
-import java.util.stream.Stream
 
 /**
  * Service interface for entities with a generated numeric ID.
@@ -24,11 +23,6 @@ interface GenericService<T : AbstractEntity> : Service<T> {
      * Finds an entity by its [id], returning `null` if not found.
      */
     fun tryFindById(id: Long): T?
-
-    /**
-     * Returns a lazily-loaded [Stream] of all entities, fetched in batches of [batchSize].
-     */
-    fun findAsStream(batchSize: Int): Stream<T>
 
     /**
      * Removes entities by their [ids].

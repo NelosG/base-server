@@ -37,11 +37,6 @@ abstract class GenericDaoImpl<T : AbstractEntity> : DaoImpl<T>(), GenericDao<T> 
     }
 
     @Transactional(propagation = Propagation.REQUIRED)
-    override fun remove(entity: T) {
-        remove(entity.id ?: error("Missing id in entity for removal"))
-    }
-
-    @Transactional(propagation = Propagation.REQUIRED)
     override fun remove(id: Long) {
         val cb = entityManager.criteriaBuilder
         val cd = cb.createCriteriaDelete(entityClass)

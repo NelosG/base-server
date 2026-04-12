@@ -70,6 +70,18 @@ abstract class DaoImpl<T : Entity> : Dao<T> {
         return entities.map(::save)
     }
 
+    @Transactional(propagation = Propagation.REQUIRED)
+    override fun remove(entity: T) {
+        // Use entityManager.remove (not bulk CriteriaDelete) when the caller already has
+        // the entity loaded into the persistence context. Bulk delete bypasses the PC,
+        // so on flush Hibernate would still try to UPDATE the just-deleted row from any
+        // dirty-marked managed snapshot (notably entities with @JdbcTypeCode(SqlTypes.JSON)
+        // collection columns whose elements lack equals() and thus always look dirty),
+        // producing StaleObjectStateException.
+        val managed = if (entityManager.contains(entity)) entity else entityManager.merge(entity)
+        entityManager.remove(managed)
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun <K> runInTransaction(supplier: Supplier<K>): K {
         return supplier.get()
