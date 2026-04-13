@@ -26,11 +26,6 @@
         </dependency>
         <dependency>
             <groupId>nelos.parallel</groupId>
-            <artifactId>parallel-server-forms</artifactId>
-            <version>${parallel-server.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>nelos.parallel</groupId>
             <artifactId>parallel-server-auth-forms</artifactId>
             <version>${parallel-server.version}</version>
         </dependency>

@@ -9,14 +9,14 @@
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
-    <name>Parallel Server Forms</name>
-    <artifactId>parallel-server-forms</artifactId>
+    <name>Parallel Server Jobs</name>
+    <artifactId>parallel-server-jobs</artifactId>
     <packaging>jar</packaging>
 
     <dependencies>
         <dependency>
             <groupId>nelos.parallel</groupId>
-            <artifactId>parallel-server-core-forms</artifactId>
+            <artifactId>parallel-server-core-commons</artifactId>
             <version>${parallel-server.version}</version>
         </dependency>
     </dependencies>

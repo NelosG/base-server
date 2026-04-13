@@ -16,7 +16,6 @@
         <module>core</module>
         <module>adapters</module>
         <module>dev-app</module>
-        <module>forms</module>
         <module>git</module>
         <module>jobs</module>
     </modules>
