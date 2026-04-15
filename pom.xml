@@ -18,6 +18,7 @@
         <module>dev-app</module>
         <module>git</module>
         <module>jobs</module>
+        <module>gitlab</module>
     </modules>
 
     <properties>
