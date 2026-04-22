@@ -47,4 +47,13 @@ interface NodeRegistry {
      * Replaces the stored node info with the given [node].
      */
     fun updateNode(node: NodeInfo): NodeInfo
+
+    /**
+     * Drops any cached snapshot of the registry, forcing the next [findAll] /
+     * [findByTransport] to re-read from the underlying store. Call this when a
+     * dispatch attempt found nodes in cache but none of them could be reached -
+     * the cache may be stale (node went down externally) and the next attempt
+     * should see fresh state.
+     */
+    fun invalidateCache()
 }

@@ -4,6 +4,7 @@ import com.nelos.parallel.commons.adapter.enums.AdapterStatus
 import com.nelos.parallel.commons.adapter.enums.TransportType
 import com.nelos.parallel.commons.adapter.vo.NodeInfo
 import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Component
 
 /**
  * Manages transport-aware node deregistration and health check failures.
@@ -14,6 +15,7 @@ import org.slf4j.LoggerFactory
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
+@Component("prl.nodeTransportManager")
 class NodeTransportManager(
     private val nodeRegistry: NodeRegistry,
     private val adapterRegistry: NodeAdapterRegistry,
@@ -75,15 +77,35 @@ class NodeTransportManager(
         }
 
         if (!refreshed) {
+            // Race guard: if the node re-registered itself during our network
+            // probe loop (a fresh ONLINE event for the same nodeId), the
+            // current registry state already supersedes `remaining`. Wiping it
+            // now would destroy the live re-registration.
+            if (registeredSince(nodeId, remaining.registeredAt)) {
+                LOG.info("Aborting offline handler for {} - node re-registered during probe", nodeId)
+                return false
+            }
             nodeRegistry.deregister(nodeId)
             LOG.info("Node {} removed (no running transports responded)", nodeId)
             return true
         }
 
         for (type in nonResponding) {
+            // Same race guard before stripping transports.
+            if (registeredSince(nodeId, remaining.registeredAt)) {
+                LOG.info("Aborting transport cleanup for {} - node re-registered during probe", nodeId)
+                return false
+            }
             nodeRegistry.removeTransport(nodeId, type)
         }
         return false
+    }
+
+    /** True if a (presumed-newer) registration of [nodeId] is present in the
+     *  registry with a `registeredAt` strictly newer than [sinceTimestamp]. */
+    private fun registeredSince(nodeId: String, sinceTimestamp: java.time.Instant): Boolean {
+        val current = nodeRegistry.findById(nodeId) ?: return false
+        return current.registeredAt.isAfter(sinceTimestamp)
     }
 
     /**
