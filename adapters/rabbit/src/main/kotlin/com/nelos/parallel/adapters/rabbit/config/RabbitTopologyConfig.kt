@@ -2,6 +2,8 @@ package com.nelos.parallel.adapters.rabbit.config
 
 import com.nelos.parallel.adapters.rabbit.RabbitConstants
 import org.springframework.amqp.core.*
+import org.springframework.amqp.rabbit.connection.ConnectionFactory
+import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -35,8 +37,8 @@ class RabbitTopologyConfig {
         QueueBuilder.durable(RabbitConstants.RESULTS_QUEUE).build()
 
     @Bean
-    fun nodeEventsQueue(): Queue =
-        QueueBuilder.durable(RabbitConstants.NODE_EVENTS_QUEUE).build()
+    fun progressQueue(): Queue =
+        QueueBuilder.durable(RabbitConstants.PROGRESS_QUEUE).build()
 
     @Bean
     fun correctnessBinding(tasksQueue: Queue, testDirectExchange: DirectExchange): Binding =
@@ -59,6 +61,25 @@ class RabbitTopologyConfig {
             .with(RabbitConstants.ROUTING_KEY_RESULTS)
 
     @Bean
-    fun nodeEventsBinding(nodeEventsQueue: Queue, nodeFanoutExchange: FanoutExchange): Binding =
-        BindingBuilder.bind(nodeEventsQueue).to(nodeFanoutExchange)
+    fun progressBinding(progressQueue: Queue, testDirectExchange: DirectExchange): Binding =
+        BindingBuilder.bind(progressQueue).to(testDirectExchange)
+            .with(RabbitConstants.ROUTING_KEY_PROGRESS)
+
+    /**
+     * Dedicated RabbitTemplate for *control RPCs* (statusRequest, queueStatus,
+     * cancelJob, etc.) with a short reply timeout. The default Spring template
+     * uses `spring.rabbitmq.template.reply-timeout=30000` which is sized for
+     * `submitTask` (engine has to queue the job before acking), but health
+     * checks against dead nodes shouldn't burn 30s of Tomcat thread time -
+     * 5s is plenty for a live node to respond.
+     */
+    @Bean("prl.controlRabbitTemplate")
+    fun controlRabbitTemplate(connectionFactory: ConnectionFactory): RabbitTemplate =
+        RabbitTemplate(connectionFactory).apply {
+            setReplyTimeout(CONTROL_REPLY_TIMEOUT_MS)
+        }
+
+    companion object {
+        private const val CONTROL_REPLY_TIMEOUT_MS = 5_000L
+    }
 }

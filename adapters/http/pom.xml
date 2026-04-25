@@ -19,6 +19,11 @@
             <artifactId>parallel-server-core-adapters</artifactId>
             <version>${parallel-server.version}</version>
         </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-gitlab-pipeline</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
 
         <!-- SPRING -->
         <dependency>

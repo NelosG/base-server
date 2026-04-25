@@ -1,4 +1,4 @@
-package com.nelos.parallel.commons.adapter.vo.request
+package com.nelos.parallel.commons.adapter.vo.response
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
@@ -6,14 +6,19 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 
 /**
- * Request for updating dynamic configuration on a test-runner node.
+ * Engine-side per-job defaults and tuning knobs.
+ *
+ * Emitted in the `engineConfig` block of `info` node events. Mirrors the
+ * fields accepted by PUT `/api/config` / RabbitMQ `updateConfig` so the
+ * orchestrator can read back what the engine is actually using after any
+ * `server.json` overrides or runtime updates.
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-class ConfigUpdateRequest @JsonCreator constructor(
+class EngineConfig @JsonCreator constructor(
     @param:JsonProperty("maxCorrectnessWorkers") val maxCorrectnessWorkers: Int? = null,
     @param:JsonProperty("jobRetentionSeconds") val jobRetentionSeconds: Int? = null,
     @param:JsonProperty("defaultMemoryLimitMb") val defaultMemoryLimitMb: Long? = null,

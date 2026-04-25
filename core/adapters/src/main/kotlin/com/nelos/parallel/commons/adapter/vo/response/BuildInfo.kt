@@ -14,5 +14,5 @@ import com.fasterxml.jackson.annotation.JsonProperty
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 class BuildInfo @JsonCreator constructor(
-    @param:JsonProperty("solutionCmakeReplaced") val solutionCmakeReplaced: Boolean? = null,
+    @param:JsonProperty("pluginLoadError") val pluginLoadError: String? = null,
 )

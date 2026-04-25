@@ -16,11 +16,12 @@ object RabbitConstants {
     // Queues
     const val TASKS_QUEUE = "test.tasks"
     const val RESULTS_QUEUE = "test.results"
-    const val NODE_EVENTS_QUEUE = "node.events"
+    const val PROGRESS_QUEUE = "test.progress"
 
     // Routing keys
     const val ROUTING_KEY_CORRECTNESS = "correctness"
     const val ROUTING_KEY_PERFORMANCE = "performance"
     const val ROUTING_KEY_ALL = "all"
     const val ROUTING_KEY_RESULTS = "results"
+    const val ROUTING_KEY_PROGRESS = "progress"
 }

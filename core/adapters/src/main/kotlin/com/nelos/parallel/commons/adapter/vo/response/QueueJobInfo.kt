@@ -4,19 +4,18 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.databind.node.ObjectNode
-import com.nelos.parallel.commons.adapter.enums.AdapterStatus
 
 /**
- * Information about a resource provider on a test-runner node.
+ * Per-job entry in [QueueStatus.jobs] - produced by the runner's
+ * `JobQueue::get_status()`. `position` is set only for queued jobs.
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class ResourceProviderInfo @JsonCreator constructor(
-    @param:JsonProperty("name") val name: String,
-    @param:JsonProperty("status") val status: AdapterStatus? = null,
-    @param:JsonProperty("config") val config: ObjectNode? = null,
+class QueueJobInfo @JsonCreator constructor(
+    @param:JsonProperty("jobId") val jobId: String,
+    @param:JsonProperty("status") val status: String,
+    @param:JsonProperty("position") val position: Int? = null,
 )

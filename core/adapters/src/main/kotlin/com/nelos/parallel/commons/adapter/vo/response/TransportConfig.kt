@@ -15,7 +15,7 @@ sealed class TransportConfig {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonIgnoreProperties(ignoreUnknown = true)
-    class HttpConfig @JsonCreator constructor(
+    data class HttpConfig @JsonCreator constructor(
         @param:JsonProperty("port") val port: Int? = null,
         @param:JsonProperty("host") val host: String? = null,
         @param:JsonProperty("authToken") val authToken: String? = null,
@@ -23,7 +23,7 @@ sealed class TransportConfig {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonIgnoreProperties(ignoreUnknown = true)
-    class AmqpConfig @JsonCreator constructor(
+    data class AmqpConfig @JsonCreator constructor(
         @param:JsonProperty("host") val host: String? = null,
         @param:JsonProperty("port") val port: Int? = null,
         @param:JsonProperty("vhost") val vhost: String? = null,

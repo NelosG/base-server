@@ -4,10 +4,15 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.nelos.parallel.commons.adapter.enums.NodeEventType
 
 /**
  * Runtime status of a test-runner node.
+ *
+ * The `type` field is intentionally a free-form [String] rather than [com.nelos.parallel.commons.adapter.enums.NodeEventType]:
+ * the runner sends `"info"` for direct status queries (HTTP `/api/node/status`),
+ * but rewrites it to `"statusResponse"` (or any `<command>Response` form) when
+ * the same payload is published as an AMQP control reply. We accept both shapes
+ * since the orchestrator uses the field only for diagnostics.
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
@@ -15,16 +20,12 @@ import com.nelos.parallel.commons.adapter.enums.NodeEventType
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 class NodeStatus @JsonCreator constructor(
-    @param:JsonProperty("type") val type: NodeEventType? = null,
+    @param:JsonProperty("type") val type: String? = null,
     @param:JsonProperty("nodeId") val nodeId: String,
-    @param:JsonProperty("capabilities") val capabilities: Map<String, Any?>? = null,
-    @param:JsonProperty("activeJobs") val activeJobs: Int? = null,
-    @param:JsonProperty("queuedJobs") val queuedJobs: Int? = null,
-    @param:JsonProperty("queue") val queue: Map<String, Any?>? = null,
-    @param:JsonProperty("currentLoad") val currentLoad: Map<String, Any?>? = null,
+    @param:JsonProperty("capabilities") val capabilities: NodeCapabilities? = null,
+    @param:JsonProperty("currentLoad") val currentLoad: QueueStatus? = null,
+    @param:JsonProperty("engineConfig") val engineConfig: EngineConfig? = null,
     @param:JsonProperty("transports") val transports: List<TransportInfo>? = null,
     @param:JsonProperty("resourceProviders") val resourceProviders: List<ResourceProviderInfo>? = null,
-    @param:JsonProperty("timestamp") val timestamp: String? = null
-) {
-    fun effectiveQueue(): Map<String, Any?>? = queue ?: currentLoad
-}
+    @param:JsonProperty("timestamp") val timestamp: String? = null,
+)

@@ -19,5 +19,6 @@ class TestRun @JsonCreator constructor(
     @param:JsonProperty("message") val message: String? = null,
     @param:JsonProperty("stats") val stats: RunStats? = null,
     @param:JsonProperty("parallelStats") val parallelStats: ParallelStats? = null,
-    @param:JsonProperty("memoryStats") val memoryStats: MemoryStats? = null,
+    @param:JsonProperty("processStats") val processStats: ProcessStats? = null,
+    @param:JsonProperty("stderrOutput") val stderrOutput: String? = null,
 )

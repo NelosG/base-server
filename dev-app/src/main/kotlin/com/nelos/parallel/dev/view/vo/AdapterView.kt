@@ -16,7 +16,5 @@ import com.nelos.parallel.commons.adapter.enums.AdapterStatus
 class AdapterView @JsonCreator constructor(
     @param:JsonProperty("name") val name: String,
     @param:JsonProperty("status") val status: AdapterStatus?,
-    @param:JsonProperty("dllPath") val dllPath: String?,
-    @param:JsonProperty("type") val type: String? = null,
     @param:JsonProperty("config") val config: ObjectNode? = null,
 )

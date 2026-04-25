@@ -8,15 +8,12 @@ import com.nelos.parallel.commons.adapter.vo.NodeInfo
 import com.nelos.parallel.commons.adapter.vo.request.NodeRegistrationRequest
 import com.nelos.parallel.commons.adapter.vo.response.NodeRegistrationResponse
 import com.nelos.parallel.commons.adapter.vo.response.TransportConfig
-import com.nelos.parallel.commons.adapter.vo.response.TransportInfo
-import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
-import java.net.InetAddress
 import java.time.Instant
 
 /**
@@ -32,18 +29,14 @@ class NodeRegistrationController @Autowired constructor(
 ) {
 
     @PostMapping("/api/register")
-    fun register(
-        @RequestBody request: NodeRegistrationRequest,
-        httpRequest: HttpServletRequest
-    ): ResponseEntity<NodeRegistrationResponse> {
+    fun register(@RequestBody request: NodeRegistrationRequest): ResponseEntity<NodeRegistrationResponse> {
         if (request.nodeId.isBlank()) {
             return ResponseEntity.badRequest().body(
                 NodeRegistrationResponse(status = "error", nodeId = request.nodeId)
             )
         }
-
         return when (request.type ?: NodeEventType.ONLINE) {
-            NodeEventType.ONLINE -> handleOnline(request, httpRequest)
+            NodeEventType.ONLINE -> handleOnline(request)
             NodeEventType.OFFLINE -> handleOffline(request)
             else -> ResponseEntity.badRequest().body(
                 NodeRegistrationResponse(status = "error", nodeId = request.nodeId)
@@ -51,33 +44,20 @@ class NodeRegistrationController @Autowired constructor(
         }
     }
 
-    private fun handleOnline(
-        request: NodeRegistrationRequest,
-        httpRequest: HttpServletRequest
-    ): ResponseEntity<NodeRegistrationResponse> {
+    private fun handleOnline(request: NodeRegistrationRequest): ResponseEntity<NodeRegistrationResponse> {
         val httpConfig = request.transports
             ?.firstOrNull { it.type == TransportType.HTTP }
             ?.config as? TransportConfig.HttpConfig
+            ?: return badRequest(request.nodeId, "missing HTTP transport config")
 
-        val host = httpConfig?.host
-        if (host.isNullOrBlank()) {
-            LOG.warn("Node {} online event missing valid HTTP host", request.nodeId)
-            return ResponseEntity.badRequest().body(
-                NodeRegistrationResponse(status = "error", nodeId = request.nodeId)
-            )
-        }
-
-        val port = httpConfig?.port
-        if (port == null || port <= 0) {
-            LOG.warn("Node {} online event missing valid HTTP port", request.nodeId)
-            return ResponseEntity.badRequest().body(
-                NodeRegistrationResponse(status = "error", nodeId = request.nodeId)
-            )
-        }
+        val host = httpConfig.host?.takeIf { it.isNotBlank() }
+            ?: return badRequest(request.nodeId, "missing valid HTTP host")
+        val port = httpConfig.port?.takeIf { it > 0 }
+            ?: return badRequest(request.nodeId, "missing valid HTTP port")
 
         val nodeInfo = NodeInfo(
             nodeId = request.nodeId,
-            capabilities = request.capabilities ?: emptyMap(),
+            capabilities = request.capabilities,
             transports = request.transports,
             resourceProviders = request.resourceProviders,
             registeredAt = Instant.now()
@@ -108,10 +88,9 @@ class NodeRegistrationController @Autowired constructor(
         )
     }
 
-    private fun normalizeHost(addr: String): String {
-        val inet = try { InetAddress.getByName(addr) } catch (_: Exception) { return addr }
-        if (inet.isLoopbackAddress) return "127.0.0.1"
-        return addr
+    private fun badRequest(nodeId: String, reason: String): ResponseEntity<NodeRegistrationResponse> {
+        LOG.warn("Node {} online event rejected: {}", nodeId, reason)
+        return ResponseEntity.badRequest().body(NodeRegistrationResponse(status = "error", nodeId = nodeId))
     }
 
     companion object {

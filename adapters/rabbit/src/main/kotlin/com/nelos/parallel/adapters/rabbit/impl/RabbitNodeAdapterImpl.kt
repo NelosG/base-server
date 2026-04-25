@@ -9,10 +9,18 @@ import com.nelos.parallel.commons.adapter.enums.TransportType
 import com.nelos.parallel.commons.adapter.vo.NodeInfo
 import com.nelos.parallel.commons.adapter.vo.request.*
 import com.nelos.parallel.commons.adapter.vo.response.*
+import com.rabbitmq.client.AMQP
+import com.rabbitmq.client.DefaultConsumer
+import com.rabbitmq.client.Envelope
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.core.Message
 import org.springframework.amqp.core.MessageProperties
 import org.springframework.amqp.rabbit.core.RabbitTemplate
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.stereotype.Component
+import java.time.Instant
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * RabbitMQ-based implementation of [com.nelos.parallel.commons.adapter.NodeAdapter].
@@ -21,16 +29,24 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
+@Component("prl.rabbitNodeAdapter")
 class RabbitNodeAdapterImpl(
     private val rabbitTemplate: RabbitTemplate,
-    private val objectMapper: ObjectMapper
+    // Short-timeout template used only for control RPCs (statusRequest,
+    // queueStatus, cancelJob, list*, load*, etc.) - see RabbitTopologyConfig
+    // for the reply-timeout setting. submitTask uses the default rabbitTemplate
+    // because engine acceptance ack can take longer (queue insertion + position
+    // assignment).
+    @Qualifier("prl.controlRabbitTemplate")
+    private val controlRabbitTemplate: RabbitTemplate,
+    private val objectMapper: ObjectMapper,
 ) : RabbitNodeAdapter {
 
     override val transportType: TransportType = TransportType.AMQP
 
     override fun submitTask(node: NodeInfo, task: TaskSubmission): TaskSubmissionResponse =
         adapterCall("Failed to submit task via AMQP to node ${node.nodeId}") {
-            val routingKey = task.mode?.toValue() ?: RabbitConstants.ROUTING_KEY_CORRECTNESS
+            val routingKey = RabbitConstants.ROUTING_KEY_CORRECTNESS
             val message = jsonMessage(task) {
                 setHeader("nodeId", node.nodeId)
             }
@@ -46,8 +62,10 @@ class RabbitNodeAdapterImpl(
 
     override fun queryJobStatus(node: NodeInfo, jobId: String): TaskResult =
         adapterCall("Failed to query job $jobId on node ${node.nodeId}") {
+            // Runner wraps the response in a JobInfo envelope - the full TaskResult
+            // is nested under `result` only when the job is completed.
             val response = sendControlMessage("getJobInfo", node.nodeId, "jobId" to jobId)
-            objectMapper.readValue(response, TaskResult::class.java)
+            objectMapper.readValue(response, JobInfoEnvelope::class.java).toTaskResult()
         }
 
     override fun cancelJob(node: NodeInfo, jobId: String): CancelJobResponse =
@@ -74,10 +92,7 @@ class RabbitNodeAdapterImpl(
     override fun queueStatus(node: NodeInfo): QueueStatus =
         adapterCall("Failed to query queue status of node ${node.nodeId}") {
             val response = sendControlMessage("queueStatus", node.nodeId)
-            val tree = objectMapper.readTree(response)
-            val queue = tree.get("queue") ?: tree
-
-            objectMapper.readValue(queue.traverse(), QueueStatus::class.java)
+            objectMapper.readValue(response, QueueStatus::class.java)
         }
 
     override fun listAdapters(node: NodeInfo): List<AdapterInfo> =
@@ -115,11 +130,7 @@ class RabbitNodeAdapterImpl(
 
     override fun updateConfig(node: NodeInfo, config: ConfigUpdateRequest): QueueStatus =
         adapterCall("Failed to update config on node ${node.nodeId}") {
-            val configMap = buildMap<String, Any?> {
-                config.maxCorrectnessWorkers?.let { put("maxCorrectnessWorkers", it) }
-                config.jobRetentionSeconds?.let { put("jobRetentionSeconds", it) }
-            }
-            val response = sendControlMessage("updateConfig", node.nodeId, "config" to configMap)
+            val response = sendControlMessage("updateConfig", node.nodeId, "config" to config)
             objectMapper.readValue(response, QueueStatus::class.java)
         }
 
@@ -156,6 +167,65 @@ class RabbitNodeAdapterImpl(
             objectMapper.readValue(response, ResourceProviderActionResult::class.java)
         }
 
+    override fun discoverNodes(timeoutMs: Long): List<NodeInfo> {
+        val correlationId = UUID.randomUUID().toString()
+        val replies = ConcurrentHashMap<String, NodeInfo>()
+        return try {
+            rabbitTemplate.connectionFactory.createConnection().use { connection ->
+                connection.createChannel(false).use { channel ->
+                    val replyQueue = channel.queueDeclare().queue
+                    val consumerTag = channel.basicConsume(replyQueue, true, object : DefaultConsumer(channel) {
+                        override fun handleDelivery(
+                            consumerTag: String,
+                            envelope: Envelope,
+                            properties: AMQP.BasicProperties,
+                            body: ByteArray,
+                        ) {
+                            if (properties.correlationId != correlationId) return
+                            runCatching {
+                                val status = objectMapper.readValue(body, NodeStatus::class.java)
+                                replies[status.nodeId] = NodeInfo(
+                                    nodeId = status.nodeId,
+                                    capabilities = status.capabilities,
+                                    transports = status.transports,
+                                    resourceProviders = status.resourceProviders,
+                                    registeredAt = Instant.now(),
+                                )
+                            }.onFailure { LOG.warn("Failed to parse discovery reply: {}", it.message) }
+                        }
+                    })
+                    val request = mapOf("type" to "statusRequest")
+                    val payload = objectMapper.writeValueAsBytes(request)
+                    val props = AMQP.BasicProperties.Builder()
+                        .contentType(MessageProperties.CONTENT_TYPE_JSON)
+                        .replyTo(replyQueue)
+                        .correlationId(correlationId)
+                        .build()
+                    channel.basicPublish(RabbitConstants.NODE_FANOUT_EXCHANGE, "", props, payload)
+                    try {
+                        Thread.sleep(timeoutMs)
+                    } catch (e: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        LOG.warn("Discovery wait interrupted; returning {} replies received so far", replies.size)
+                    } finally {
+                        // basicCancel is a synchronous AMQP RPC - skip it if we
+                        // were interrupted (shutdown scenario) so we don't block
+                        // for the broker's network timeout during JVM exit. The
+                        // channel.close() invoked by the surrounding .use {}
+                        // block will cancel the consumer server-side anyway.
+                        if (!Thread.currentThread().isInterrupted) {
+                            runCatching { channel.basicCancel(consumerTag) }
+                        }
+                    }
+                }
+            }
+            replies.values.toList()
+        } catch (e: Exception) {
+            LOG.warn("Node discovery failed: {}", e.message)
+            emptyList()
+        }
+    }
+
     private fun sendControlMessage(
         type: String,
         nodeId: String,
@@ -167,7 +237,10 @@ class RabbitNodeAdapterImpl(
             extra.forEach { (k, v) -> put(k, v) }
         }
 
-        val response = rabbitTemplate.sendAndReceive(
+        // Control RPCs go through the short-timeout template so health checks
+        // and status queries against unresponsive nodes don't burn a 30s
+        // Tomcat-thread window each.
+        val response = controlRabbitTemplate.sendAndReceive(
             RabbitConstants.NODE_CONTROL_EXCHANGE, nodeId, jsonMessage(request)
         )
 

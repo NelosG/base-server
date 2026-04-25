@@ -2,11 +2,12 @@ package com.nelos.parallel.dev.view.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
 import com.nelos.parallel.commons.adapter.NodeAdapter
 import com.nelos.parallel.commons.adapter.NodeRegistry
 import com.nelos.parallel.commons.adapter.NodeTransportManager
 import com.nelos.parallel.commons.adapter.enums.SourceType
-import com.nelos.parallel.commons.adapter.enums.TestMode
 import com.nelos.parallel.commons.adapter.enums.TransportType
 import com.nelos.parallel.commons.adapter.listener.TaskResultListenerRegistry
 import com.nelos.parallel.commons.adapter.vo.NodeInfo
@@ -15,14 +16,10 @@ import com.nelos.parallel.commons.adapter.vo.request.SourceDescriptor
 import com.nelos.parallel.commons.adapter.vo.request.TaskSubmission
 import com.nelos.parallel.commons.adapter.vo.response.TaskResult
 import com.nelos.parallel.dev.view.vo.*
-import com.nelos.parallel.dev.vo.AdapterRequest
-import com.nelos.parallel.dev.vo.ConfigRequest
-import com.nelos.parallel.dev.vo.JobQueryRequest
-import com.nelos.parallel.dev.vo.ResourceProviderRequest
-import com.nelos.parallel.dev.vo.TaskSubmitRequest
+import com.nelos.parallel.dev.vo.*
 import org.slf4j.Logger
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
+import java.time.Duration
+import java.util.*
 
 /**
  * Base class for adapter test view services - provides common operations
@@ -38,7 +35,17 @@ abstract class AbstractAdapterTestViewService(
     protected val transportManager: NodeTransportManager,
 ) {
 
-    private val resultCache = ConcurrentHashMap<String, TaskResult>()
+    /**
+     * Stores the latest [TaskResult] per jobId for the admin-test polling endpoint.
+     * Caffeine bounds memory both by size (max 64 entries) and time (10 min after write):
+     * if the admin closes the browser mid-test, the result is evicted automatically.
+     * Concurrency-safe by design - populated from runner callback / AMQP-listener threads
+     * and drained by HTTP request threads.
+     */
+    private val resultCache: Cache<String, TaskResult> = Caffeine.newBuilder()
+        .maximumSize(MAX_RESULT_CACHE_SIZE.toLong())
+        .expireAfterWrite(Duration.ofMinutes(RESULT_CACHE_TTL_MIN))
+        .build()
 
     protected abstract val transportType: TransportType
 
@@ -49,7 +56,7 @@ abstract class AbstractAdapterTestViewService(
     fun getNodes(): List<NodeView> =
         nodeRegistry.findByTransport(transportType).map { it.toView() }
 
-    fun refreshAndPruneNodes(): List<NodeView> {
+    open fun refreshAndPruneNodes(): List<NodeView> {
         nodeRegistry.findByTransport(transportType)
             .filterNot { runCatching { adapter.healthCheck(it) }.getOrDefault(false) }
             .forEach { node ->
@@ -70,8 +77,9 @@ abstract class AbstractAdapterTestViewService(
             val status = adapter.queryNodeStatus(node)
             NodeStatusView(
                 nodeId = status.nodeId,
-                capabilities = status.capabilities ?: emptyMap(),
-                queue = status.effectiveQueue(),
+                capabilities = status.capabilities,
+                queue = status.currentLoad,
+                engineConfig = status.engineConfig,
                 transports = status.transports,
                 resourceProviders = status.resourceProviders,
             )
@@ -80,7 +88,8 @@ abstract class AbstractAdapterTestViewService(
     fun queueStatus(nodeId: String): QueueStatusView =
         withNode(nodeId) { node ->
             val qs = adapter.queueStatus(node)
-            toQueueStatusView(nodeId, qs)
+            val engineConfig = runCatching { adapter.queryNodeStatus(node).engineConfig }.getOrNull()
+            toQueueStatusView(nodeId, qs, engineConfig)
         }
 
     fun submitTask(data: TaskSubmitRequest): TaskSubmitResultView {
@@ -89,7 +98,7 @@ abstract class AbstractAdapterTestViewService(
         return withNode(nodeId) { node ->
             val jobId = data.jobId ?: UUID.randomUUID().toString()
             listenerRegistry.register(jobId) { result ->
-                resultCache[jobId] = result
+                resultCache.put(jobId, result)
             }
             try {
                 val task = TaskSubmission(
@@ -105,9 +114,7 @@ abstract class AbstractAdapterTestViewService(
                         data.testSourceType, data.testUrl, data.testBranch,
                         data.testToken, data.testPath
                     ),
-                    mode = TestMode.fromValue(data.mode ?: "correctness"),
                     threads = data.threads,
-                    numaNode = data.numaNode,
                     callbackUrl = resolveCallbackUrl(),
                     memoryLimitMb = data.memoryLimitMb,
                 )
@@ -117,7 +124,6 @@ abstract class AbstractAdapterTestViewService(
                     status = response.status,
                     position = response.position,
                     nodeId = response.nodeId,
-                    mode = response.mode,
                     solution = response.solution,
                     memoryLimitMb = response.memoryLimitMb,
                     timestamp = response.timestamp,
@@ -142,9 +148,11 @@ abstract class AbstractAdapterTestViewService(
                 branch = branch,
                 token = token,
             )
+
             "local" -> SourceDescriptor.LocalSource(
                 path = path ?: error("path is required for local source"),
             )
+
             null, "" -> null
             else -> error("Unknown source type: $type")
         }
@@ -166,8 +174,6 @@ abstract class AbstractAdapterTestViewService(
                 correctness = result.correctness,
                 performance = result.performance,
                 buildInfo = result.buildInfo,
-                lane = result.lane,
-                position = result.position,
                 timestamp = result.timestamp,
             )
         }
@@ -189,20 +195,25 @@ abstract class AbstractAdapterTestViewService(
                 maxCorrectnessWorkers = data.maxCorrectnessWorkers,
                 jobRetentionSeconds = data.jobRetentionSeconds,
                 defaultMemoryLimitMb = data.defaultMemoryLimitMb,
+                defaultThreads = data.defaultThreads,
+                defaultWallTimeSec = data.defaultWallTimeSec,
+                defaultCpuTimeSec = data.defaultCpuTimeSec,
+                sandboxProcessMultiplier = data.sandboxProcessMultiplier,
             )
             val qs = adapter.updateConfig(node, request)
-            toQueueStatusView(nodeId, qs)
+            val engineConfig = runCatching { adapter.queryNodeStatus(node).engineConfig }.getOrNull()
+            toQueueStatusView(nodeId, qs, engineConfig)
         }
     }
 
     fun listAdapters(nodeId: String): List<AdapterView> =
         withNode(nodeId) { node ->
-            adapter.listAdapters(node).map { AdapterView(it.name, it.status, it.dllPath, it.type, it.config) }
+            adapter.listAdapters(node).map { AdapterView(it.name, it.status, it.config) }
         }
 
     fun listAvailableAdapters(nodeId: String): List<AdapterView> =
         withNode(nodeId) { node ->
-            adapter.listAvailableAdapters(node).map { AdapterView(it.name, it.status, it.dllPath, it.type, it.config) }
+            adapter.listAvailableAdapters(node).map { AdapterView(it.name, it.status, it.config) }
         }
 
     fun loadAdapter(data: AdapterRequest): AdapterActionView {
@@ -226,12 +237,12 @@ abstract class AbstractAdapterTestViewService(
 
     fun listResourceProviders(nodeId: String): List<ResourceProviderView> =
         withNode(nodeId) { node ->
-            adapter.listResourceProviders(node).map { ResourceProviderView(it.name, it.status, it.dllPath, it.config) }
+            adapter.listResourceProviders(node).map { ResourceProviderView(it.name, it.status, it.config) }
         }
 
     fun listAvailableResourceProviders(nodeId: String): List<ResourceProviderView> =
         withNode(nodeId) { node ->
-            adapter.listAvailableResourceProviders(node).map { ResourceProviderView(it.name, it.status, it.dllPath, it.config) }
+            adapter.listAvailableResourceProviders(node).map { ResourceProviderView(it.name, it.status, it.config) }
         }
 
     fun loadResourceProvider(data: ResourceProviderRequest): ResourceProviderActionView {
@@ -254,7 +265,8 @@ abstract class AbstractAdapterTestViewService(
     }
 
     fun pollTaskResult(jobId: String): JobStatusView? {
-        val result = resultCache.remove(jobId) ?: return null
+        // asMap().remove is atomic and returns the previous value - equivalent to ConcurrentHashMap.remove.
+        val result = resultCache.asMap().remove(jobId) ?: return null
         return JobStatusView(
             jobId = result.jobId ?: jobId,
             nodeId = result.nodeId,
@@ -267,8 +279,6 @@ abstract class AbstractAdapterTestViewService(
             correctness = result.correctness,
             performance = result.performance,
             buildInfo = result.buildInfo,
-            lane = result.lane,
-            position = result.position,
             timestamp = result.timestamp,
         )
     }
@@ -278,21 +288,21 @@ abstract class AbstractAdapterTestViewService(
         return RemoveNodeView(nodeId, removed)
     }
 
-    private fun toQueueStatusView(nodeId: String, qs: com.nelos.parallel.commons.adapter.vo.response.QueueStatus) =
+    private fun toQueueStatusView(
+        nodeId: String,
+        qs: com.nelos.parallel.commons.adapter.vo.response.QueueStatus,
+        engineConfig: com.nelos.parallel.commons.adapter.vo.response.EngineConfig? = null,
+    ) =
         QueueStatusView(
             nodeId = nodeId,
-            correctnessQueue = qs.effectiveCorrectnessQueue()?.let {
-                QueueInfoView(it.queued, it.running, it.totalWorkers)
-            },
-            performanceQueue = qs.effectivePerformanceQueue()?.let {
-                QueueInfoView(it.queued, it.running, it.totalWorkers)
-            },
             status = qs.status,
+            queueSize = qs.queueSize,
+            activeJobs = qs.activeJobs,
+            perfPhaseRunning = qs.perfPhaseRunning,
+            perfPhasePending = qs.perfPhasePending,
             maxCorrectnessWorkers = qs.maxCorrectnessWorkers,
-            maxOmpThreads = qs.maxOmpThreads,
-            currentPerfJob = qs.currentPerfJob,
-            jobRetentionSeconds = qs.jobRetentionSeconds,
-            defaultMemoryLimitMb = qs.defaultMemoryLimitMb,
+            jobs = qs.jobs,
+            engineConfig = engineConfig,
         )
 
     protected open fun resolveCallbackUrl(): String? = null
@@ -305,7 +315,7 @@ abstract class AbstractAdapterTestViewService(
 
     protected fun NodeInfo.toView(): NodeView = NodeView(
         nodeId = nodeId,
-        capabilities = capabilities ?: emptyMap(),
+        capabilities = capabilities,
         transports = transports,
         resourceProviders = resourceProviders,
         registeredAt = registeredAt.toString(),
@@ -320,5 +330,7 @@ abstract class AbstractAdapterTestViewService(
 
     companion object {
         const val CALLBACK_URL = "/api/callback/result"
+        private const val MAX_RESULT_CACHE_SIZE = 64
+        private const val RESULT_CACHE_TTL_MIN = 10L
     }
 }

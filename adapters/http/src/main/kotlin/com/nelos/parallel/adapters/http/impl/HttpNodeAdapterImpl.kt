@@ -11,6 +11,7 @@ import com.nelos.parallel.commons.adapter.vo.request.*
 import com.nelos.parallel.commons.adapter.vo.response.*
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
+import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.body
 
@@ -21,9 +22,10 @@ import org.springframework.web.client.body
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
+@Component("prl.httpNodeAdapter")
 class HttpNodeAdapterImpl(
     private val restClient: RestClient,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
 ) : HttpNodeAdapter {
 
     override val transportType: TransportType = TransportType.HTTP
@@ -42,12 +44,15 @@ class HttpNodeAdapterImpl(
 
     override fun queryJobStatus(node: NodeInfo, jobId: String): TaskResult =
         adapterCall("Failed to query job $jobId on node ${node.nodeId}") {
-            restClient.get()
+            // Runner wraps the response in a JobInfo envelope - the full TaskResult
+            // is nested under `result` only when the job is completed.
+            val envelope = restClient.get()
                 .uri("${node.baseUrl}/api/jobs/$jobId")
                 .authHeaders(node)
                 .retrieve()
-                .body<TaskResult>()
+                .body<JobInfoEnvelope>()
                 ?: throw AdapterException("Empty response from node ${node.nodeId}")
+            envelope.toTaskResult()
         }
 
     override fun cancelJob(node: NodeInfo, jobId: String): CancelJobResponse =
@@ -142,7 +147,7 @@ class HttpNodeAdapterImpl(
                 .uri("${node.baseUrl}/api/config")
                 .authHeaders(node)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(config)
+                .body(mapOf("config" to config))
                 .retrieve()
                 .body<QueueStatus>()
                 ?: throw AdapterException("Empty response from node ${node.nodeId}")

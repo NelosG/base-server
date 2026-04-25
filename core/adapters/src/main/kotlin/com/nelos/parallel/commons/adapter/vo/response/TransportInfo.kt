@@ -18,7 +18,7 @@ import com.nelos.parallel.commons.adapter.enums.TransportType
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonDeserialize(using = TransportInfo.Deserializer::class)
-class TransportInfo(
+data class TransportInfo(
     val type: TransportType,
     val status: AdapterStatus? = null,
     val config: TransportConfig? = null,

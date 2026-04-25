@@ -20,4 +20,7 @@ class RunStats @JsonCreator constructor(
     @param:JsonProperty("parallelism") val parallelism: Double,
     @param:JsonProperty("speedup") val speedup: Double,
     @param:JsonProperty("efficiency") val efficiency: Double,
+    @param:JsonProperty("computeEfficiency") val computeEfficiency: Double? = null,
+    @param:JsonProperty("loadBalanceRatio") val loadBalanceRatio: Double? = null,
+    @param:JsonProperty("avgTaskWorkMs") val avgTaskWorkMs: Double? = null,
 )

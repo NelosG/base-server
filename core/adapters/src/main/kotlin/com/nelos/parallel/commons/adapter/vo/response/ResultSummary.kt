@@ -6,16 +6,14 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 
 /**
- * Memory usage statistics for a single test run.
+ * Aggregated summary containing per-mode test statistics.
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-class MemoryStats @JsonCreator constructor(
-    @param:JsonProperty("peakMemoryBytes") val peakMemoryBytes: Long? = null,
-    @param:JsonProperty("allocations") val allocations: Long? = null,
-    @param:JsonProperty("deallocations") val deallocations: Long? = null,
-    @param:JsonProperty("limitExceeded") val limitExceeded: Boolean? = null,
+class ResultSummary @JsonCreator constructor(
+    @param:JsonProperty("correctness") val correctness: TestSummary? = null,
+    @param:JsonProperty("performance") val performance: TestSummary? = null,
 )

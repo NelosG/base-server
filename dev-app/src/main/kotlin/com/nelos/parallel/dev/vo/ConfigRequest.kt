@@ -18,4 +18,8 @@ class ConfigRequest @JsonCreator constructor(
     @param:JsonProperty("maxCorrectnessWorkers") val maxCorrectnessWorkers: Int? = null,
     @param:JsonProperty("jobRetentionSeconds") val jobRetentionSeconds: Int? = null,
     @param:JsonProperty("defaultMemoryLimitMb") val defaultMemoryLimitMb: Long? = null,
+    @param:JsonProperty("defaultThreads") val defaultThreads: Int? = null,
+    @param:JsonProperty("defaultWallTimeSec") val defaultWallTimeSec: Int? = null,
+    @param:JsonProperty("defaultCpuTimeSec") val defaultCpuTimeSec: Int? = null,
+    @param:JsonProperty("sandboxProcessMultiplier") val sandboxProcessMultiplier: Int? = null,
 )

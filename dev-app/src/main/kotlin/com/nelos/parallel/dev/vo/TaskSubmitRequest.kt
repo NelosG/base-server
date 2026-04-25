@@ -29,6 +29,5 @@ class TaskSubmitRequest @JsonCreator constructor(
     @param:JsonProperty("testPath") val testPath: String? = null,
     @param:JsonProperty("mode") val mode: String? = "correctness",
     @param:JsonProperty("threads") val threads: Int? = null,
-    @param:JsonProperty("numaNode") val numaNode: Int? = null,
     @param:JsonProperty("memoryLimitMb") val memoryLimitMb: Long? = null,
 )

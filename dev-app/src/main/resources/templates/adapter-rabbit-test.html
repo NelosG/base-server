@@ -3,6 +3,7 @@
     <head>
         <meta charset="UTF-8">
         <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <link href="/favicon.svg" rel="icon" type="image/svg+xml">
         <title>RabbitMQ Adapter Test</title>
         <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
         <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
@@ -87,7 +88,8 @@
                                 <button class="btn btn-outline-secondary" onclick="AdapterTestCommon.doListProviders()">
                                     <i class="bi bi-archive"></i> List Providers
                                 </button>
-                                <button class="btn btn-outline-secondary" onclick="AdapterTestCommon.doListAvailableProviders()">
+                                <button class="btn btn-outline-secondary"
+                                        onclick="AdapterTestCommon.doListAvailableProviders()">
                                     <i class="bi bi-archive-fill"></i> Available Providers
                                 </button>
                             </div>
@@ -99,11 +101,11 @@
                 <div class="col-md-6">
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                                <span><i class="bi bi-plug"></i> Adapter Management</span>
-                                <button class="btn btn-sm btn-outline-light" onclick="AdapterTestCommon.refreshAdapters()">
-                                    <i class="bi bi-arrow-clockwise"></i> Refresh
-                                </button>
-                            </div>
+                            <span><i class="bi bi-plug"></i> Adapter Management</span>
+                            <button class="btn btn-sm btn-outline-light" onclick="AdapterTestCommon.refreshAdapters()">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
                         <div class="card-body">
                             <div class="mb-3">
                                 <label class="form-label">Adapter Name</label>
@@ -115,7 +117,7 @@
                                 <div class="mb-3">
                                     <label class="form-label">Config JSON</label>
                                     <textarea class="form-control font-mono" id="adapter-config"
-                                              rows="1" placeholder='{}'></textarea>
+                                              placeholder='{}' rows="1"></textarea>
                                     <small class="text-muted">Optional configuration object</small>
                                 </div>
                                 <button class="btn btn-success w-100" onclick="AdapterTestCommon.doLoadAdapter()">
@@ -125,7 +127,7 @@
                             <div id="adapter-unload-section" style="display:none;">
                                 <div class="mb-3" id="adapter-config-display" style="display:none;">
                                     <label class="form-label text-muted">Current Config</label>
-                                    <pre id="adapter-running-config" class="prl-config-display"></pre>
+                                    <pre class="prl-config-display" id="adapter-running-config"></pre>
                                 </div>
                                 <button class="btn btn-warning w-100" onclick="AdapterTestCommon.doUnloadAdapter()">
                                     <i class="bi bi-dash-circle"></i> Unload
@@ -152,7 +154,7 @@
                                 <div class="mb-3">
                                     <label class="form-label">Config JSON</label>
                                     <textarea class="form-control font-mono" id="provider-config"
-                                              rows="1" placeholder='{}'></textarea>
+                                              placeholder='{}' rows="1"></textarea>
                                     <small class="text-muted">Optional configuration object</small>
                                 </div>
                                 <button class="btn btn-success w-100" onclick="AdapterTestCommon.doLoadProvider()">
@@ -162,7 +164,7 @@
                             <div id="provider-unload-section" style="display:none;">
                                 <div class="mb-3" id="provider-config-display" style="display:none;">
                                     <label class="form-label text-muted">Current Config</label>
-                                    <pre id="provider-running-config" class="prl-config-display"></pre>
+                                    <pre class="prl-config-display" id="provider-running-config"></pre>
                                 </div>
                                 <button class="btn btn-warning w-100" onclick="AdapterTestCommon.doUnloadProvider()">
                                     <i class="bi bi-dash-circle"></i> Unload
@@ -180,15 +182,39 @@
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Max Correctness Workers</label>
-                            <input class="form-control" id="config-max-workers" type="number" placeholder="current value">
+                            <input class="form-control" id="config-max-workers" placeholder="current value"
+                                   type="number">
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Job Retention (seconds)</label>
-                            <input class="form-control" id="config-retention" type="number" placeholder="current value">
+                            <input class="form-control" id="config-retention" placeholder="current value" type="number">
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Default Memory Limit (MB)</label>
-                            <input class="form-control" id="config-memory-limit" type="number" placeholder="current value">
+                            <input class="form-control" id="config-memory-limit" placeholder="current value"
+                                   type="number">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Default Threads</label>
+                            <input class="form-control" id="config-default-threads" placeholder="current value"
+                                   type="number">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Default Wall Time (s)</label>
+                            <input class="form-control" id="config-default-wall" placeholder="current value"
+                                   type="number">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Default CPU Time (s)</label>
+                            <input class="form-control" id="config-default-cpu" placeholder="current value"
+                                   type="number">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Sandbox Process Multiplier</label>
+                            <input class="form-control" id="config-sandbox-multiplier" placeholder="current value"
+                                   type="number">
                         </div>
                     </div>
                     <button class="btn btn-primary" onclick="AdapterTestCommon.doUpdateConfig()">
@@ -213,7 +239,8 @@
                         </div>
                         <div class="col-md-3 mb-3">
                             <label class="form-label">Test ID</label>
-                            <input class="form-control" id="task-test-id" placeholder="from folder name if empty" type="text">
+                            <input class="form-control" id="task-test-id" placeholder="from folder name if empty"
+                                   type="text">
                         </div>
                         <div class="col-md-3 mb-3">
                             <label class="form-label">Mode (routing key)</label>
@@ -231,7 +258,8 @@
                     <div class="row">
                         <div class="col-md-3 mb-3">
                             <label class="form-label">Memory Limit (MB)</label>
-                            <input class="form-control" id="task-memory-limit" placeholder="server default" type="number">
+                            <input class="form-control" id="task-memory-limit" placeholder="server default"
+                                   type="number">
                         </div>
                     </div>
                     <!-- Solution Source -->
@@ -338,18 +366,18 @@
         </div>
 
         <!-- Result Modal -->
-        <div class="modal fade" id="result-modal" tabindex="-1" aria-hidden="true">
+        <div aria-hidden="true" class="modal fade" id="result-modal" tabindex="-1">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Result</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button aria-label="Close" class="btn-close" data-bs-dismiss="modal" type="button"></button>
                     </div>
                     <div class="modal-body">
                         <pre class="mb-0" style="white-space: pre-wrap; word-break: break-word;"></pre>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Close</button>
                     </div>
                 </div>
             </div>

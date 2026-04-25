@@ -41,8 +41,8 @@ var AdapterTestCommon = (function () {
         entry.className = "prl-log-entry" + (isError ? " prl-log-error" : " prl-log-success");
         entry.innerHTML =
             "<div>" +
-                "<span class='prl-log-ts'>" + escapeHtml(ts) + "</span>" +
-                "<span class='prl-log-label'>" + escapeHtml(label) + "</span>" +
+            "<span class='prl-log-ts'>" + escapeHtml(ts) + "</span>" +
+            "<span class='prl-log-label'>" + escapeHtml(label) + "</span>" +
             "</div>" +
             "<div class='prl-log-json'>" + escapeHtml(jsonStr) + "</div>";
 
@@ -510,8 +510,8 @@ var AdapterTestCommon = (function () {
                 showResultPopup("Load Provider: " + name, r);
                 refreshProviderList(id);
             }).catch(function (e) {
-                log("Load Provider ERROR", e.message);
-            });
+            log("Load Provider ERROR", e.message);
+        });
     }
 
     function doUnloadProvider() {
@@ -528,8 +528,8 @@ var AdapterTestCommon = (function () {
                 showResultPopup("Unload Provider: " + name, r);
                 refreshProviderList(id);
             }).catch(function (e) {
-                log("Unload Provider ERROR", e.message);
-            });
+            log("Unload Provider ERROR", e.message);
+        });
     }
 
     function doRemoveNode() {
@@ -569,8 +569,8 @@ var AdapterTestCommon = (function () {
                 showResultPopup("Load Adapter: " + name, r);
                 refreshAdapterList(id);
             }).catch(function (e) {
-                log("Load ERROR", e.message);
-            });
+            log("Load ERROR", e.message);
+        });
     }
 
     function doUnloadAdapter() {
@@ -587,8 +587,8 @@ var AdapterTestCommon = (function () {
                 showResultPopup("Unload Adapter: " + name, r);
                 refreshAdapterList(id);
             }).catch(function (e) {
-                log("Unload ERROR", e.message);
-            });
+            log("Unload ERROR", e.message);
+        });
     }
 
     function doSubmitTask() {
@@ -604,8 +604,8 @@ var AdapterTestCommon = (function () {
                     startResultPolling(r.jobId);
                 }
             }).catch(function (e) {
-                log("Submit ERROR", e.message);
-            });
+            log("Submit ERROR", e.message);
+        });
     }
 
     function startResultPolling(jobId) {
@@ -646,8 +646,8 @@ var AdapterTestCommon = (function () {
                 log("Job Status: " + jobId, r);
                 showResultPopup("Job Status: " + jobId, r);
             }).catch(function (e) {
-                log("Job Status ERROR", e.message);
-            });
+            log("Job Status ERROR", e.message);
+        });
     }
 
     function doCancelJob() {
@@ -663,8 +663,8 @@ var AdapterTestCommon = (function () {
                 log("Cancel Job: " + jobId, r);
                 showResultPopup("Cancel Job: " + jobId, r);
             }).catch(function (e) {
-                log("Cancel ERROR", e.message);
-            });
+            log("Cancel ERROR", e.message);
+        });
     }
 
     function doUpdateConfig() {
@@ -673,19 +673,27 @@ var AdapterTestCommon = (function () {
         var maxWorkers = document.getElementById("config-max-workers").value.trim();
         var retention = document.getElementById("config-retention").value.trim();
         var memLimit = document.getElementById("config-memory-limit").value.trim();
+        var defThreads = document.getElementById("config-default-threads").value.trim();
+        var defWall = document.getElementById("config-default-wall").value.trim();
+        var defCpu = document.getElementById("config-default-cpu").value.trim();
+        var procMul = document.getElementById("config-sandbox-multiplier").value.trim();
         var data = {
             nodeId: id,
             maxCorrectnessWorkers: maxWorkers ? parseInt(maxWorkers) : null,
             jobRetentionSeconds: retention ? parseInt(retention) : null,
             defaultMemoryLimitMb: memLimit ? parseInt(memLimit) : null,
+            defaultThreads: defThreads ? parseInt(defThreads) : null,
+            defaultWallTimeSec: defWall ? parseInt(defWall) : null,
+            defaultCpuTimeSec: defCpu ? parseInt(defCpu) : null,
+            sandboxProcessMultiplier: procMul ? parseInt(procMul) : null,
         };
         ViewEngine.call(currentSVC, "updateConfig", [data])
             .then(function (r) {
                 log("Update Config on " + id, r);
                 showResultPopup("Update Config: " + id, r);
             }).catch(function (e) {
-                log("Update Config ERROR", e.message);
-            });
+            log("Update Config ERROR", e.message);
+        });
     }
 
     // -- Init ----------------------------------------------

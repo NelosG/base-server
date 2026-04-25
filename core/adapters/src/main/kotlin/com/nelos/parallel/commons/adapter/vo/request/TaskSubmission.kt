@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.nelos.parallel.commons.adapter.enums.SourceType
-import com.nelos.parallel.commons.adapter.enums.TestMode
 
 /**
  * A task to be submitted to a test-runner node.
@@ -22,9 +21,10 @@ class TaskSubmission @JsonCreator constructor(
     @param:JsonProperty("solutionSource") val solutionSource: SourceDescriptor? = null,
     @param:JsonProperty("testSourceType") val testSourceType: SourceType? = null,
     @param:JsonProperty("testSource") val testSource: SourceDescriptor? = null,
-    @param:JsonProperty("mode") val mode: TestMode? = TestMode.CORRECTNESS,
     @param:JsonProperty("threads") val threads: Int? = null,
-    @param:JsonProperty("numaNode") val numaNode: Int? = null,
     @param:JsonProperty("callbackUrl") val callbackUrl: String? = null,
-    @param:JsonProperty("memoryLimitMb") val memoryLimitMb: Long? = null
+    @param:JsonProperty("memoryLimitMb") val memoryLimitMb: Long? = null,
+    @param:JsonProperty("wallTimeSec") val wallTimeSec: Int? = null,
+    @param:JsonProperty("cpuTimeSec") val cpuTimeSec: Int? = null,
+    @param:JsonProperty("maxProcesses") val maxProcesses: Int? = null,
 )
