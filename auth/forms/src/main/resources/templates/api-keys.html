@@ -3,11 +3,13 @@
     <head>
         <meta charset="UTF-8">
         <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <link href="/favicon.svg" rel="icon" type="image/svg+xml">
         <title>API Keys</title>
         <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
         <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
         <link href="/css/main.css" rel="stylesheet"/>
         <script src="/js/view-engine.js"></script>
+        <script src="/js/prl-utils.js"></script>
         <script src="/js/navbar.js"></script>
     </head>
     <body>
@@ -20,17 +22,21 @@
                 </button>
             </div>
 
-            <!-- Create Key Section (hidden by default) -->
-            <div class="card mb-4 d-none" id="create-section">
+            <div class="card mb-4 d-none" id="create-card">
                 <div class="card-body">
+                    <div class="alert d-none" id="create-alert"></div>
                     <div class="row align-items-end">
                         <div class="col-md-8">
                             <label class="form-label" for="key-name">Key Name</label>
-                            <input class="form-control" id="key-name"
-                                   placeholder="e.g. test-runner-prod" type="text">
+                            <input class="form-control" id="key-name" placeholder="e.g. test-runner-prod" type="text">
                         </div>
                         <div class="col-md-4 mt-2 mt-md-0">
-                            <button class="btn btn-success w-100" id="btn-create">
+                            <button class="btn btn-success w-100"
+                                    data-prl-alert="#create-alert"
+                                    data-prl-args="createArgs"
+                                    data-prl-form="prl.apiKeyViewService.createApiKey"
+                                    data-prl-success="onCreated"
+                                    data-prl-validate="validateCreate">
                                 <i class="bi bi-plus-circle"></i> Create
                             </button>
                         </div>
@@ -38,7 +44,6 @@
                 </div>
             </div>
 
-            <!-- Raw Key Alert (shown once after creation) -->
             <div class="alert alert-warning d-none" id="raw-key-alert">
                 <h6 class="alert-heading"><i class="bi bi-exclamation-triangle"></i> Save this key now!</h6>
                 <p class="mb-2">This key will only be shown once. Copy it before closing this alert.</p>
@@ -51,143 +56,87 @@
                 <button class="btn btn-sm btn-outline-warning" id="btn-dismiss-key">Dismiss</button>
             </div>
 
-            <!-- Keys Table -->
             <div class="card">
                 <div class="card-body p-0">
-                    <div class="text-center p-4 d-none" id="keys-loading">
-                        <div class="spinner-border text-primary" role="status"></div>
-                    </div>
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0" id="keys-table">
+                        <table class="table table-hover mb-0"
+                               data-prl-empty="#empty"
+                               data-prl-list="prl.apiKeyViewService.getApiKeys"
+                               data-prl-row="keyRow">
                             <thead>
                                 <tr>
                                     <th>Prefix</th>
                                     <th>Name</th>
                                     <th>Active</th>
                                     <th>Created</th>
-                                    <th>Actions</th>
+                                    <th></th>
                                 </tr>
                             </thead>
-                            <tbody id="keys-tbody">
-                            </tbody>
+                            <tbody></tbody>
                         </table>
                     </div>
-                    <div class="text-center text-muted p-3 d-none" id="keys-empty">
-                        No API keys yet.
-                    </div>
+                    <div class="text-center text-muted p-3 d-none" id="empty">No API keys yet.</div>
                 </div>
             </div>
         </div>
 
         <script>
-            var SVC = "prl.apiKeyViewService";
+            const SVC = "prl.apiKeyViewService";
 
-            function loadKeys() {
-                var loading = document.getElementById("keys-loading");
-                var tbody = document.getElementById("keys-tbody");
-                var empty = document.getElementById("keys-empty");
-
-                loading.classList.remove("d-none");
-                tbody.innerHTML = "";
-                empty.classList.add("d-none");
-
-                ViewEngine.call(SVC, "getApiKeys", []).then(function (keys) {
-                    loading.classList.add("d-none");
-                    if (!keys || keys.length === 0) {
-                        empty.classList.remove("d-none");
-                        return;
-                    }
-                    keys.forEach(function (key) {
-                        var tr = document.createElement("tr");
-                        tr.innerHTML =
-                            "<td><code>" + escapeHtml(key.keyPrefix) + "...</code></td>" +
-                            "<td>" + escapeHtml(key.name) + "</td>" +
-                            "<td>" + (key.active
-                                ? "<span class='badge bg-success'>Active</span>"
-                                : "<span class='badge bg-secondary'>Inactive</span>") + "</td>" +
-                            "<td>" + formatDate(key.createdAt) + "</td>" +
-                            "<td><button class='btn btn-sm btn-outline-danger btn-delete' data-id='" + key.id + "'>" +
-                                "<i class='bi bi-trash'></i></button></td>";
-                        tbody.appendChild(tr);
-                    });
-                    bindDeleteButtons();
-                }).catch(function (err) {
-                    loading.classList.add("d-none");
-                    console.error("Failed to load API keys", err);
-                });
+            function validateCreate() {
+                return Prl.val("#key-name").trim() ? null : "Name is required";
             }
 
-            function bindDeleteButtons() {
-                document.querySelectorAll(".btn-delete").forEach(function (btn) {
-                    btn.addEventListener("click", function () {
-                        var id = parseInt(this.getAttribute("data-id"));
-                        if (!confirm("Delete this API key?")) return;
-                        ViewEngine.call(SVC, "deleteApiKey", [{id: id}]).then(function () {
-                            loadKeys();
-                        }).catch(function (err) {
-                            console.error("Failed to delete API key", err);
-                        });
-                    });
-                });
+            function createArgs() {
+                return [{name: Prl.val("#key-name").trim()}];
             }
 
-            function escapeHtml(str) {
-                var div = document.createElement("div");
-                div.textContent = str || "";
-                return div.innerHTML;
+            function onCreated(resp) {
+                Prl.$("#key-name").value = "";
+                Prl.$("#create-card").classList.add("d-none");
+                Prl.$("#raw-key-value").value = resp.rawKey;
+                Prl.$("#raw-key-alert").classList.remove("d-none");
+                Prl.reloadList();
             }
 
-            function formatDate(iso) {
-                if (!iso) return "";
-                try {
-                    return new Date(iso).toLocaleString();
-                } catch (e) {
-                    return iso;
-                }
+            function keyRow(k) {
+                const tr = document.createElement("tr");
+                const prefixTd = document.createElement("td");
+                prefixTd.appendChild(Prl.el("code", {text: (k.keyPrefix || "") + "..."}));
+                tr.appendChild(prefixTd);
+                tr.appendChild(Prl.td(k.name || ""));
+
+                const activeTd = document.createElement("td");
+                activeTd.appendChild(Prl.el("span", {
+                    className: "badge " + (k.active ? "bg-success" : "bg-secondary"),
+                    text: k.active ? "Active" : "Inactive",
+                }));
+                tr.appendChild(activeTd);
+
+                tr.appendChild(Prl.td(Prl.formatDate(k.createdAt)));
+
+                const actTd = document.createElement("td");
+                actTd.appendChild(Prl.el("button", {
+                    className: "btn btn-sm btn-outline-danger",
+                    onClick: () => Prl.confirmCall("Delete this API key?",
+                        SVC, "deleteApiKey", [{id: k.id}], () => Prl.reloadList()),
+                }));
+                actTd.lastChild.appendChild(Prl.el("i", {className: "bi bi-trash"}));
+                return tr;
             }
 
-            document.getElementById("btn-show-create").addEventListener("click", function () {
-                var section = document.getElementById("create-section");
-                section.classList.toggle("d-none");
-                if (!section.classList.contains("d-none")) {
-                    document.getElementById("key-name").focus();
-                }
+            Prl.$("#btn-show-create").addEventListener("click", () => {
+                Prl.$("#create-card").classList.toggle("d-none");
+                if (!Prl.$("#create-card").classList.contains("d-none")) Prl.$("#key-name").focus();
             });
-
-            document.getElementById("btn-create").addEventListener("click", function () {
-                var name = document.getElementById("key-name").value.trim();
-                if (!name) {
-                    document.getElementById("key-name").focus();
-                    return;
-                }
-
-                ViewEngine.call(SVC, "createApiKey", [{name: name}]).then(function (resp) {
-                    document.getElementById("key-name").value = "";
-                    document.getElementById("create-section").classList.add("d-none");
-
-                    var alert = document.getElementById("raw-key-alert");
-                    document.getElementById("raw-key-value").value = resp.rawKey;
-                    alert.classList.remove("d-none");
-
-                    loadKeys();
-                }).catch(function (err) {
-                    console.error("Failed to create API key", err);
-                });
-            });
-
-            document.getElementById("btn-copy-key").addEventListener("click", function () {
-                var input = document.getElementById("raw-key-value");
+            Prl.$("#btn-copy-key").addEventListener("click", () => {
+                const input = Prl.$("#raw-key-value");
                 input.select();
                 navigator.clipboard.writeText(input.value);
             });
-
-            document.getElementById("btn-dismiss-key").addEventListener("click", function () {
-                document.getElementById("raw-key-alert").classList.add("d-none");
-                document.getElementById("raw-key-value").value = "";
-            });
-
-            document.addEventListener("DOMContentLoaded", function () {
-                loadKeys();
+            Prl.$("#btn-dismiss-key").addEventListener("click", () => {
+                Prl.$("#raw-key-alert").classList.add("d-none");
+                Prl.$("#raw-key-value").value = "";
             });
         </script>
     </body>

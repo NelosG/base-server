@@ -22,6 +22,13 @@ enum class UserType(private val dbKey: String, private val roles: List<String>) 
             AppRole.ROLE_ADMIN,
             AppRole.ROLE_USER,
         ),
+    ),
+    STUDENT(
+        "ST",
+        listOf(
+            AppRole.ROLE_STUDENT,
+            AppRole.ROLE_USER,
+        ),
     );
 
     override fun getDbKey() = dbKey

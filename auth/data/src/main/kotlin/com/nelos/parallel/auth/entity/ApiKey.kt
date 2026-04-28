@@ -20,19 +20,19 @@ class ApiKey : AbstractEntity() {
     @SequenceGenerator(name = "${TABLE_NAME}_seq", sequenceName = "seq_${TABLE_NAME}", allocationSize = 1)
     override fun getId(): Long? = id
 
-    @get:Column(name = "key_hash", nullable = false)
+    @get:Column(name = "key_hash")
     var keyHash: String? = null
 
-    @get:Column(name = "key_prefix", nullable = false, length = 8)
+    @get:Column(name = "key_prefix")
     var keyPrefix: String? = null
 
-    @get:Column(name = "name", nullable = false)
+    @get:Column(name = "name")
     var name: String? = null
 
-    @get:Column(name = "active", nullable = false)
+    @get:Column(name = "active")
     var active: Boolean = true
 
-    @get:Column(name = "created_at", nullable = false)
+    @get:Column(name = "created_at")
     var createdAt: Instant = Instant.now()
 
     companion object {

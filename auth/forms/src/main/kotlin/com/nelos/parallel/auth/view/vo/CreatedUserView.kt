@@ -6,17 +6,16 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 
 /**
- * User view object containing the login, display name, and assigned roles. The
- * `passwordChangeRequired` flag tells the front-end to surface the OTP-change modal.
+ * Returned once after a user is created (or has their password reset). Contains the generated
+ * one-time password in plain text - admin must capture it and forward to the user.
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-class UserDetailedView @JsonCreator constructor(
+class CreatedUserView @JsonCreator constructor(
+    @param:JsonProperty("id") val id: Long,
     @param:JsonProperty("login") val login: String,
-    @param:JsonProperty("displayName") val displayName: String? = null,
-    @param:JsonProperty("roles") val roles: List<String>,
-    @param:JsonProperty("passwordChangeRequired") val passwordChangeRequired: Boolean = false,
+    @param:JsonProperty("password") val password: String,
 )

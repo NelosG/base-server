@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 
 /**
- * Lightweight user view object containing only the login.
+ * Lightweight view of a user for admin listings.
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
@@ -14,5 +14,8 @@ import com.fasterxml.jackson.annotation.JsonProperty
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 class UserView @JsonCreator constructor(
-    @param:JsonProperty("login") val login: String,
+    @param:JsonProperty("id") val id: Long? = null,
+    @param:JsonProperty("login") val login: String? = null,
+    @param:JsonProperty("displayName") val displayName: String? = null,
+    @param:JsonProperty("type") val type: String? = null,
 )

@@ -1,7 +1,7 @@
 package com.nelos.parallel.auth.service
 
 import com.nelos.parallel.auth.filter.CookieJwtAuthenticationFilter
-import com.nelos.parallel.auth.vo.SignData
+import com.nelos.parallel.auth.vo.LoginData
 import com.nelos.parallel.auth.vo.UserData
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -26,7 +26,7 @@ class AuthService(
     /**
      * Authenticates the user with the provided [data] and sets a JWT cookie on the [response].
      */
-    fun authenticate(data: SignData, request: HttpServletRequest, response: HttpServletResponse) {
+    fun authenticate(data: LoginData, request: HttpServletRequest, response: HttpServletResponse) {
         val auth = authenticationManager.authenticate(
             UsernamePasswordAuthenticationToken(data.login, data.password)
         )

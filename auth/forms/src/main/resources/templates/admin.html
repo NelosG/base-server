@@ -3,41 +3,140 @@
     <head>
         <meta charset="UTF-8">
         <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <link href="/favicon.svg" rel="icon" type="image/svg+xml">
         <title>Admin</title>
         <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
         <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
         <link href="/css/main.css" rel="stylesheet"/>
         <script src="/js/view-engine.js"></script>
+        <script src="/js/prl-utils.js"></script>
         <script src="/js/navbar.js"></script>
     </head>
     <body>
 
         <div class="container mt-4">
-            <div class="row justify-content-center">
-                <div class="col-md-6 col-lg-4">
-                    <div class="card"
-                         data-view-save="createAdmin"
-                         data-view-service="prl.adminViewService">
-                        <div class="card-header text-center">
-                            <h4 class="mb-0"><i class="bi bi-shield-lock"></i> Create Admin</h4>
-                        </div>
-                        <div class="card-body">
-                            <div class="alert d-none" data-view-alert></div>
-                            <div class="mb-3">
-                                <label class="form-label" for="login">Login</label>
-                                <input autofocus class="form-control" id="login"
-                                       name="login" placeholder="Enter login" type="text">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label" for="password">Password</label>
-                                <input class="form-control" id="password"
-                                       name="password" placeholder="Enter password" type="password">
-                            </div>
-                            <button class="btn btn-primary w-100" data-view-save-btn>Create admin</button>
-                        </div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="mb-0"><i class="bi bi-shield-lock"></i> Admins</h3>
+                <button class="btn btn-primary" id="btn-show-create">
+                    <i class="bi bi-plus-lg"></i> Create admin
+                </button>
+            </div>
+
+            <div class="card mb-3 d-none" id="create-card">
+                <div class="card-body">
+                    <h5 class="card-title">Create admin</h5>
+                    <div class="alert d-none" id="create-alert"></div>
+                    <div class="mb-3">
+                        <label class="form-label" for="new-login">Login *</label>
+                        <input class="form-control" id="new-login" type="text">
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="new-display-name">Display name</label>
+                        <input class="form-control" id="new-display-name" placeholder="Defaults to login" type="text">
+                    </div>
+                    <p class="text-muted small">A one-time password is generated. The new admin must change it on first
+                                                login.</p>
+                    <button class="btn btn-success"
+                            data-prl-alert="#create-alert"
+                            data-prl-args="createArgs"
+                            data-prl-form="prl.userMgmtViewService.createAdmin"
+                            data-prl-success="onCreated"
+                            data-prl-validate="validateCreate">Create
+                    </button>
+                    <button class="btn btn-outline-secondary" id="btn-cancel-create">Cancel</button>
+                </div>
+            </div>
+
+            <div class="alert alert-warning d-none" id="created-alert">
+                <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Save this password - shown once</h6>
+                <p class="mb-2">
+                    Login: <code id="created-login"></code><br>
+                    Password: <code id="created-password"></code>
+                </p>
+                <button class="btn btn-sm btn-outline-warning" id="btn-dismiss-created">Dismiss</button>
+            </div>
+
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0"
+                               data-prl-empty="#empty"
+                               data-prl-list="prl.userMgmtViewService.getAdmins"
+                               data-prl-row="adminRow">
+                            <thead>
+                                <tr>
+                                    <th>Login</th>
+                                    <th>Display name</th>
+                                    <th>Type</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="text-center text-muted p-3 d-none" id="empty">No admins.</div>
                 </div>
             </div>
         </div>
+
+        <script>
+            const SVC = "prl.userMgmtViewService";
+
+            function validateCreate() {
+                return Prl.val("#new-login").trim() ? null : "Login is required";
+            }
+
+            function createArgs() {
+                return [Prl.val("#new-login").trim(), Prl.val("#new-display-name").trim() || null];
+            }
+
+            function onCreated(user) {
+                Prl.$("#create-card").classList.add("d-none");
+                Prl.clearInputs("#create-card");
+                showCreated(user.login, user.password);
+                Prl.reloadList();
+            }
+
+            function showCreated(login, password) {
+                Prl.fillTexts({"#created-login": login, "#created-password": password});
+                Prl.$("#created-alert").classList.remove("d-none");
+                window.scrollTo({top: 0, behavior: "smooth"});
+            }
+
+            function adminRow(u) {
+                const tr = document.createElement("tr");
+                tr.appendChild(Prl.td(u.login || ""));
+                tr.appendChild(Prl.td(u.displayName || ""));
+                tr.appendChild(Prl.td(u.type || ""));
+                tr.appendChild(adminActions(u));
+                return tr;
+            }
+
+            function adminActions(u) {
+                const td = document.createElement("td");
+                td.appendChild(Prl.el("button", {
+                    className: "btn btn-sm btn-outline-warning me-1", text: "Reset password",
+                    onClick: () => Prl.confirmCall("Reset password for '" + u.login + "'?",
+                        SVC, "resetPassword", [u.id], raw => {
+                            showCreated(u.login, raw);
+                            Prl.reloadList();
+                        }),
+                }));
+                if (u.login !== "admin") {
+                    td.appendChild(Prl.el("button", {
+                        className: "btn btn-sm btn-outline-danger", text: "Delete",
+                        onClick: () => Prl.confirmCall("Delete user '" + u.login + "'?",
+                            SVC, "deleteAdmin", [u.login], () => Prl.reloadList()),
+                    }));
+                }
+                return td;
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                Prl.$("#btn-show-create").addEventListener("click", () => Prl.$("#create-card").classList.toggle("d-none"));
+                Prl.$("#btn-cancel-create").addEventListener("click", () => Prl.$("#create-card").classList.add("d-none"));
+                Prl.$("#btn-dismiss-created").addEventListener("click", () => Prl.$("#created-alert").classList.add("d-none"));
+            });
+        </script>
     </body>
 </html>

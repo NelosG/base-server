@@ -1,5 +1,13 @@
 package com.nelos.parallel.commons.security
 
+import com.nelos.parallel.commons.security.AppRole.ADMIN
+import com.nelos.parallel.commons.security.AppRole.API_CLIENT
+import com.nelos.parallel.commons.security.AppRole.ROLE_ADMIN
+import com.nelos.parallel.commons.security.AppRole.ROLE_API_CLIENT
+import com.nelos.parallel.commons.security.AppRole.ROLE_USER
+import com.nelos.parallel.commons.security.AppRole.USER
+
+
 /**
  * Application-wide role constants.
  *
@@ -18,9 +26,11 @@ object AppRole {
 
     const val USER = "USER"
     const val ADMIN = "ADMIN"
+    const val STUDENT = "STUDENT"
     const val API_CLIENT = "API_CLIENT"
 
     const val ROLE_USER = PREFIX + USER
     const val ROLE_ADMIN = PREFIX + ADMIN
+    const val ROLE_STUDENT = PREFIX + STUDENT
     const val ROLE_API_CLIENT = PREFIX + API_CLIENT
 }

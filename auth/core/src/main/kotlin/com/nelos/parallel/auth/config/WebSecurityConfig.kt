@@ -40,6 +40,7 @@ class WebSecurityConfig @Autowired constructor(
     @Autowired(required = false)
     private var authenticationProviders: List<AuthenticationProvider> = emptyList()
 
+
     @Bean
     fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
 
@@ -71,12 +72,20 @@ class WebSecurityConfig @Autowired constructor(
             }
             .authorizeHttpRequests { authorize ->
                 authorize
-                    .requestMatchers("/login", "/register").permitAll()
+                    .requestMatchers("/login").permitAll()
                     .requestMatchers("/api/view/**").permitAll()
-                    .requestMatchers("/api/register", "/api/callback/**").hasAuthority(AppRole.ROLE_API_CLIENT)
+                    .requestMatchers("/api/register", "/api/callback/**", "/api/pipeline/**")
+                    .hasAuthority(AppRole.ROLE_API_CLIENT)
                     .requestMatchers("/endpoint", "/error", "/error-page").permitAll()
                     .requestMatchers("/webjars/**", "/css/**", "/js/**", "/images/**").permitAll()
-                    .requestMatchers("/admin/**", "/api-keys", "/adapter-http-test", "/adapter-rabbit-test").hasRole(AppRole.ADMIN)
+                    .requestMatchers(
+                        "/admin", "/admin/**",
+                        "/api-keys", "/adapter-http-test", "/adapter-rabbit-test",
+                        "/students", "/student", "/student-groups", "/assignments",
+                        "/submissions",
+                        "/api/students/**",
+                    ).hasAuthority(AppRole.ROLE_ADMIN)
+                    .requestMatchers("/my-submissions").hasAuthority(AppRole.ROLE_STUDENT)
                     .anyRequest().authenticated()
             }
             .exceptionHandling { exceptions ->

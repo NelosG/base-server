@@ -3,48 +3,57 @@
     <head>
         <meta charset="UTF-8">
         <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <link href="/favicon.svg" rel="icon" type="image/svg+xml">
         <title>Login</title>
-        <script src="/webjars/bootstrap/5.3.8/js/bootstrap.bundle.min.js"></script>
         <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
         <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
         <link href="/css/main.css" rel="stylesheet"/>
         <script src="/js/view-engine.js"></script>
+        <script src="/js/prl-utils.js"></script>
     </head>
     <body class="login-body">
         <div class="container">
-            <div class="login-container"
-                 data-view-redirect="/"
-                 data-view-save="signIn"
-                 data-view-service="prl.loginViewService">
+            <div class="login-container">
 
                 <div class="login-header">
                     <i class="bi bi-cpu prl-dashboard-icon" style="font-size: 2.5rem;"></i>
                     <h2 style="font-family: var(--prl-mono); font-weight: 700; letter-spacing: 0.03em;">Parallel</h2>
                 </div>
 
-                <div class="alert d-none"
-                     data-url-alert='{"error":"Invalid login or password!","unauthorized":"Unauthorized!","logout":"Successful logout"}'
-                     data-view-alert></div>
+                <div class="alert d-none" id="alert"></div>
 
                 <div class="form-group">
                     <label class="form-label">Login
-                        <input autofocus class="form-control" name="login" placeholder="Login" required type="text">
+                        <input autofocus class="form-control" id="login" placeholder="Login" required type="text">
                     </label>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Password
-                        <input class="form-control" name="password" placeholder="Password" required type="password">
+                        <input class="form-control" id="password" placeholder="Password" required type="password">
                     </label>
                 </div>
                 <div class="d-grid gap-2">
-                    <button class="btn btn-primary btn-lg" data-view-save-btn>
+                    <button class="btn btn-primary btn-lg"
+                            data-prl-alert="#alert"
+                            data-prl-args="signInArgs"
+                            data-prl-form="prl.loginViewService.signIn"
+                            data-prl-redirect="/profile">
                         <i class="bi bi-box-arrow-in-right"></i> Sign In
                     </button>
                 </div>
-                <div class="mt-1 text-end">
-                    <a class="btn btn-link" href="/register">Sign Up</a>
-                </div>
             </div>
         </div>
+
+        <script>
+            function signInArgs() {
+                return [{login: Prl.val("#login"), password: Prl.val("#password")}];
+            }
+
+            Prl.urlAlerts("#alert", {
+                error: "Invalid login or password!",
+                unauthorized: "Unauthorized!",
+                logout: "Successful logout",
+            });
+        </script>
     </body>
 </html>

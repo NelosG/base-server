@@ -28,6 +28,7 @@ class JwtTokenProvider(
     fun generateAccessToken(user: UserData): String {
         val algorithm = Algorithm.HMAC256(jwtSecret)
         return JWT.create()
+            .withIssuer(ISSUER)
             .withSubject(user.login)
             .withClaim("login", user.login)
             .withExpiresAt(genAccessExpirationDate())
@@ -42,6 +43,7 @@ class JwtTokenProvider(
     fun validateToken(token: String): String {
         val algorithm = Algorithm.HMAC256(jwtSecret)
         return JWT.require(algorithm)
+            .withIssuer(ISSUER)
             .build()
             .verify(token)
             .subject
@@ -49,6 +51,7 @@ class JwtTokenProvider(
 
     companion object {
         const val EXPIRATION_IN_DAYS = 7
+        private const val ISSUER = "parallel-server"
 
         private fun genAccessExpirationDate(): Instant {
             return Instant.now().plus(EXPIRATION_IN_DAYS.toLong(), ChronoUnit.DAYS)

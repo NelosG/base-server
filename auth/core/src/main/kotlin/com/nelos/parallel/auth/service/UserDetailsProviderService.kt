@@ -1,34 +1,30 @@
 package com.nelos.parallel.auth.service
 
 import com.nelos.parallel.auth.entity.User
+import com.nelos.parallel.auth.entity.properties.UserProperties
 import com.nelos.parallel.auth.enums.UserType
 import com.nelos.parallel.auth.exceptions.UserAlreadyExistsException
-import com.nelos.parallel.auth.vo.SignData
+import com.nelos.parallel.auth.util.RandomPasswordGenerator
 import com.nelos.parallel.auth.vo.UserData
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.stereotype.Service
 
 /**
- * User details service that loads users from the database and handles sign-up.
+ * Loads users for Spring Security and owns the password lifecycle (creation with a one-time
+ * random password, admin reset, user-driven change).
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
 @Service("prl.userDetailsProviderService")
 class UserDetailsProviderService(
-    private val repository: UserService,
+    private val users: UserService,
 ) : UserDetailsService {
 
-    /**
-     * Loads the user by [login] and returns a [UserData] instance for Spring Security.
-     *
-     * @throws UsernameNotFoundException if no user with the given login exists
-     */
     override fun loadUserByUsername(login: String): UserData {
-        val user = repository.findByLogin(login)
+        val user = users.findByLogin(login)
             ?: throw UsernameNotFoundException("User with login $login not found")
         return UserData(
             id = user.id ?: error("Id can't be null"),
@@ -39,32 +35,60 @@ class UserDetailsProviderService(
     }
 
     /**
-     * Registers a new user with the given [data].
+     * Creates a new user with a freshly generated random password. The plain text is stored
+     * once in `properties.initialPassword` and `passwordChangeRequired = true`, so the user
+     * must change it on first login. Returns the entity and the plain password for the caller
+     * to display once.
      *
-     * @param isAdmin if `true`, the user is created with admin privileges
-     * @return the persisted [User] entity
      * @throws UserAlreadyExistsException if a user with the same login already exists
      */
-    fun signUp(data: SignData, isAdmin: Boolean = false): User {
-        val login = data.login ?: error("Login can't be null")
-        val password = data.password ?: error("Password can't be null")
-
-        if (repository.findByLogin(login) != null) {
+    fun createUserWithRandomPassword(login: String, displayName: String?, type: UserType): Pair<User, String> {
+        if (users.findByLogin(login) != null) {
             throw UserAlreadyExistsException("User with login $login already exists")
         }
-
-        val type = if (isAdmin) UserType.ADMIN else UserType.USER
-
-        return try {
-            repository.save(
-                User().apply {
-                    this.login = login
-                    this.encryptedPassword = BCryptPasswordEncoder().encode(password)
-                    this.type = type
-                }
+        val raw = RandomPasswordGenerator.generate()
+        val user = users.save(User().apply {
+            this.login = login
+            this.displayName = displayName ?: login
+            this.encryptedPassword = BCryptPasswordEncoder().encode(raw)
+            this.type = type
+            this.properties = UserProperties(
+                initialPassword = raw,
+                passwordChangeRequired = true,
             )
-        } catch (_: DataIntegrityViolationException) {
-            throw UserAlreadyExistsException("User with login $login already exists")
+        })
+        return user to raw
+    }
+
+    /**
+     * Generates and applies a fresh random password for the given user. Used by admins to
+     * unblock a user who lost their password - re-arms the OTP flow.
+     */
+    fun resetPassword(userId: Long): String {
+        val user = users.tryFindById(userId)
+            ?: throw UsernameNotFoundException("User with id $userId not found")
+        val raw = RandomPasswordGenerator.generate()
+        user.encryptedPassword = BCryptPasswordEncoder().encode(raw)
+        user.properties = (user.properties ?: UserProperties()).also {
+            it.initialPassword = raw
+            it.passwordChangeRequired = true
         }
+        users.save(user)
+        return raw
+    }
+
+    /**
+     * Changes the password of the user identified by [login], clears the one-time-password
+     * fields in `properties`, and lifts the password-change requirement.
+     */
+    fun changePassword(login: String, newPassword: String) {
+        val user = users.findByLogin(login)
+            ?: throw UsernameNotFoundException("User with login $login not found")
+        user.encryptedPassword = BCryptPasswordEncoder().encode(newPassword)
+        user.properties?.let {
+            it.initialPassword = null
+            it.passwordChangeRequired = false
+        }
+        users.save(user)
     }
 }

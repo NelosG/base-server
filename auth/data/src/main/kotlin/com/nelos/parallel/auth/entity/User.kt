@@ -1,8 +1,11 @@
 package com.nelos.parallel.auth.entity
 
+import com.nelos.parallel.auth.entity.properties.UserProperties
 import com.nelos.parallel.auth.enums.UserType
 import com.nelos.parallel.commons.entity.AbstractEntity
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 /**
  * @author gpushkarev
@@ -24,8 +27,15 @@ class User : AbstractEntity() {
     @get:Column(name = "encrypted_password")
     var encryptedPassword: String? = null
 
+    @get:Column(name = "display_name")
+    var displayName: String? = null
+
     @get:Column(name = "type")
     var type: UserType? = UserType.USER
+
+    @get:Column(name = "properties")
+    @get:JdbcTypeCode(SqlTypes.JSON)
+    var properties: UserProperties? = null
 
     companion object {
         const val TABLE_NAME = "prl_user"

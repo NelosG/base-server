@@ -6,14 +6,12 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 
 /**
- * Value object carrying login and password for sign-in/sign-up requests.
- *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-class SignData @JsonCreator constructor(
-    @param:JsonProperty("login") var login: String? = null,
-    @param:JsonProperty("password") var password: String? = null,
+class ChangePasswordData @JsonCreator constructor(
+    @param:JsonProperty("currentPassword") val currentPassword: String? = null,
+    @param:JsonProperty("newPassword") val newPassword: String? = null,
 )
