@@ -51,6 +51,11 @@
             <version>${parallel-server.version}</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-gitlab-pipeline</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
 
         <!-- SPRING -->
         <dependency>

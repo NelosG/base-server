@@ -1,10 +1,34 @@
-name: parallel-server
+name: gitlab
 services:
-  parallel_db:
-    image: postgres
-    env_file:
-      - parallel-server.env
-    volumes:
-      - ./database/parallel:/var/lib/postgresql
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    hostname: gitlab.local
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://localhost:8929'
+        nginx['listen_port'] = 80
+        gitlab_rails['gitlab_shell_ssh_port'] = 2224
+        puma['worker_processes'] = 4
+        puma['min_threads'] = 4
+        puma['max_threads'] = 8
+        sidekiq['concurrency'] = 20
+        postgresql['shared_buffers'] = '1GB'
+        postgresql['effective_cache_size'] = '2GB'
+        postgresql['work_mem'] = '1GB'
+        prometheus_monitoring['enable'] = false
+        gitaly['configuration'] = { concurrency: [{ rpc: '/gitaly.SmartHTTPService/PostReceivePack', max_per_repo: 5 }] }
     ports:
-      - "5432:5432"
+      - 8929:80
+      - 2224:22
+    volumes:
+      - /mnt/ssd-pool/storage/docker/gitlab/config:/etc/gitlab
+      - /mnt/ssd-pool/storage/docker/gitlab/logs:/var/log/gitlab
+      - /mnt/ssd-pool/storage/docker/gitlab/data:/var/opt/gitlab
+    shm_size: 1g
+
+  gitlab-runner:
+    image: gitlab/gitlab-runner:latest
+    restart: unless-stopped
+    volumes:
+      - /mnt/ssd-pool/storage/docker/gitlab-runner/config:/etc/gitlab-runner
+      - /var/run/docker.sock:/var/run/docker.sock

@@ -1,0 +1,121 @@
+# Parallel Server - CI pipeline for automated testing of student solutions.
+# This file is placed in the assignment template repo and inherited by forks.
+
+stages:
+  - test
+
+test-solution:
+  stage: test
+  image: alpine:latest
+  timeout: 10m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    PARALLEL_SERVER_URL: "${PARALLEL_SERVER_URL}"
+    PARALLEL_API_KEY: "${PARALLEL_API_KEY}"
+  artifacts:
+    when: always
+    paths:
+      - test-result.json
+    expire_in: 7 days
+  script:
+    - apk add --no-cache curl jq
+    - |
+      # Determine project paths (use fallbacks for older GitLab versions)
+      TARGET_PATH="${CI_MERGE_REQUEST_PROJECT_PATH:-${CI_PROJECT_PATH}}"
+      SOURCE_PATH="${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-${CI_PROJECT_PATH}}"
+      SOURCE_URL="${CI_MERGE_REQUEST_SOURCE_PROJECT_URL:-${CI_PROJECT_URL}}"
+      # Student is the OWNER of the source fork (the namespace before the first '/'),
+      # NOT the MR author or the user who triggered the pipeline - those can be the
+      # admin running CI on behalf of a student. The fork namespace is canonical:
+      # whoever owns the fork is whose code is being tested.
+      STUDENT_USERNAME="${SOURCE_PATH%%/*}"
+
+      echo "=== Parallel Testing Pipeline ==="
+      echo "Target project: ${TARGET_PATH}"
+      echo "Source project: ${SOURCE_PATH} (student: ${STUDENT_USERNAME})"
+      echo "MR: !${CI_MERGE_REQUEST_IID} (author: ${CI_MERGE_REQUEST_AUTHOR_USERNAME:-?}, triggered by: ${GITLAB_USER_LOGIN})"
+      echo "Branch: ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
+      echo "Commit: ${CI_COMMIT_SHA}"
+      echo "Server: ${PARALLEL_SERVER_URL}"
+      echo ""
+
+      # Source repo URL = student's fork
+      SOURCE_REPO_URL="${SOURCE_URL}.git"
+
+      # Submit task to orchestrator
+      echo "Submitting to Parallel Server..."
+      PAYLOAD=$(jq -n \
+        --arg projectPath "$TARGET_PATH" \
+        --argjson mrIid "$CI_MERGE_REQUEST_IID" \
+        --arg sourceBranch "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" \
+        --arg sourceRepoUrl "$SOURCE_REPO_URL" \
+        --arg commitSha "$CI_COMMIT_SHA" \
+        --arg username "$STUDENT_USERNAME" \
+        '{projectPath: $projectPath, mrIid: $mrIid, sourceBranch: $sourceBranch, sourceRepoUrl: $sourceRepoUrl, commitSha: $commitSha, username: $username}')
+      HTTP_CODE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+        -X POST "${PARALLEL_SERVER_URL}/api/pipeline/submit" \
+        -H "X-API-Key: ${PARALLEL_API_KEY}" \
+        -H "Content-Type: application/json" \
+        -d "$PAYLOAD")
+
+      echo "HTTP response code: ${HTTP_CODE}"
+      cat /tmp/response.json
+      echo ""
+
+      if [ "$HTTP_CODE" != "200" ]; then
+        echo "ERROR: Server returned HTTP ${HTTP_CODE}"
+        cp /tmp/response.json test-result.json 2>/dev/null
+        exit 1
+      fi
+
+      RESPONSE=$(cat /tmp/response.json)
+      SUBMISSION_ID=$(echo "$RESPONSE" | jq -r '.submissionId')
+      STATUS=$(echo "$RESPONSE" | jq -r '.status')
+
+      if [ "$SUBMISSION_ID" = "-1" ] || [ "$SUBMISSION_ID" = "null" ] || [ -z "$SUBMISSION_ID" ]; then
+        echo "ERROR: Submit failed - $STATUS"
+        cp /tmp/response.json test-result.json 2>/dev/null
+        exit 1
+      fi
+
+      echo "Submission #${SUBMISSION_ID} created (status: ${STATUS})"
+      echo ""
+
+      # Poll for results (timeout controlled by job-level timeout: 10m)
+      PREV_LOG_COUNT=0
+      while true; do
+        sleep 3
+        POLL=$(curl -s "${PARALLEL_SERVER_URL}/api/pipeline/status/${SUBMISSION_ID}" \
+          -H "X-API-Key: ${PARALLEL_API_KEY}")
+
+        if [ -z "$POLL" ]; then
+          echo "WARNING: Empty response from server, retrying..."
+          continue
+        fi
+
+        FINISHED=$(echo "$POLL" | jq -r '.finished')
+        CURRENT_STATUS=$(echo "$POLL" | jq -r '.status')
+
+        # Print new progress log lines
+        LOG_COUNT=$(echo "$POLL" | jq '.logs | length')
+        if [ "$LOG_COUNT" -gt "$PREV_LOG_COUNT" ]; then
+          echo "$POLL" | jq -r ".logs[$PREV_LOG_COUNT:][]"
+          PREV_LOG_COUNT=$LOG_COUNT
+        fi
+
+        if [ "$FINISHED" = "true" ]; then
+          # Save full response (with structured result) as artifact
+          echo "$POLL" | jq '.' > test-result.json
+
+          SUCCESS=$(echo "$POLL" | jq -r '.success')
+          echo ""
+          if [ "$SUCCESS" = "true" ]; then
+            echo "=== PASSED ==="
+            exit 0
+          else
+            echo "=== FAILED ==="
+            exit 1
+          fi
+        fi
+      done
