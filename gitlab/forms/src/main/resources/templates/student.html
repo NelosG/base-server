@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark" lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+        <title>Student</title>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
+        <script src="/js/prl-utils.js"></script>
+        <script src="/js/navbar.js"></script>
+    </head>
+    <body>
+
+        <div class="container mt-4"
+             data-prl-arg="id"
+             data-prl-detail="prl.studentViewService.getStudent"
+             data-prl-success="renderGroups">
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card mb-3">
+                        <div class="card-header"><i class="bi bi-mortarboard"></i> <span data-prl-fn="pageTitle"></span>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert d-none" id="alert"></div>
+                            <p>Login: <strong data-prl-field="login"></strong></p>
+                            <div class="mb-3">
+                                <label class="form-label" for="display-name">Display name</label>
+                                <input class="form-control" data-prl-input="displayName" id="display-name" type="text">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="gitlab-name">GitLab username</label>
+                                <input class="form-control" data-prl-input="gitlabName" id="gitlab-name"
+                                       placeholder="(none)" type="text">
+                            </div>
+                            <button class="btn btn-primary"
+                                    data-prl-alert="#alert"
+                                    data-prl-args="updateArgs"
+                                    data-prl-form="prl.studentViewService.updateStudent"
+                                    data-prl-success="reloadStudent"
+                                    data-prl-success-msg="Saved.">Save
+                            </button>
+                            <button class="btn btn-outline-warning" id="btn-reset-password">Reset password</button>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning d-none" id="created-alert">
+                        <h6 class="alert-heading"><i class="bi bi-info-circle"></i> New password generated</h6>
+                        <p class="mb-2">The student must change it on first login.</p>
+                        <p class="mb-2">Password: <code id="created-password"></code></p>
+                        <button class="btn btn-sm btn-outline-warning" id="btn-dismiss-created">Dismiss</button>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header"><i class="bi bi-people"></i> Groups</div>
+                        <div class="card-body">
+                            <ul class="list-group mb-3" id="groups-list"></ul>
+                            <div class="input-group">
+                                <select class="form-select" data-prl-options="prl.studentGroupViewService.getGroups"
+                                        id="add-group-id">
+                                    <option value="">- Select group -</option>
+                                </select>
+                                <button class="btn btn-outline-primary" id="btn-add-group">Add</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header"><i class="bi bi-cloud-upload"></i> Submissions</div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0"
+                                       data-prl-args="subArgs"
+                                       data-prl-empty="#subs-empty"
+                                       data-prl-list="prl.submissionViewService.getSubmissions"
+                                       data-prl-row="subRow">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Assignment</th>
+                                            <th>MR</th>
+                                            <th>Status</th>
+                                            <th>Created</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                            <div class="text-center text-muted p-3 d-none" id="subs-empty">No submissions yet.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const SVC = "prl.studentViewService";
+            const studentId = Prl.queryId("id");
+            if (isNaN(studentId)) document.body.textContent = "Missing or invalid id parameter";
+
+            function pageTitle(d) {
+                return d.displayName || d.login || "Student";
+            }
+
+            function subArgs() {
+                return [studentId, null];
+            }
+
+            function subRow(s) {
+                return Prl.submissionRow(s);
+            }
+
+            function updateArgs() {
+                return [studentId, Prl.val("#display-name"), Prl.val("#gitlab-name")];
+            }
+
+            function reloadStudent() {
+                ViewEngine.call(SVC, "getStudent", [studentId])
+                    .then(d => {
+                        Prl.bindFields(document.body, d);
+                        renderGroups(d);
+                    })
+                    .catch(err => Prl.alert("#alert", "danger", err.message || "Student not found"));
+            }
+
+            function renderGroups(d) {
+                const ul = Prl.$("#groups-list");
+                ul.replaceChildren();
+                const ids = d.groupIds || [], names = d.groupNames || [];
+                if (ids.length === 0) {
+                    ul.appendChild(Prl.el("li", {className: "list-group-item text-muted", text: "Without group"}));
+                    return;
+                }
+                ids.forEach((gid, i) => {
+                    const li = Prl.el("li", {className: "list-group-item d-flex justify-content-between align-items-center"});
+                    li.appendChild(Prl.el("span", {text: names[i] || ("Group #" + gid)}));
+                    li.appendChild(Prl.el("button", {
+                        className: "btn btn-sm btn-outline-danger", text: "Remove",
+                        onClick: () => ViewEngine.call(SVC, "removeFromGroup", [studentId, gid]).then(reloadStudent),
+                    }));
+                    ul.appendChild(li);
+                });
+            }
+
+            Prl.$("#btn-reset-password").addEventListener("click", () => {
+                Prl.confirmCall("Reset password? The student will need to change it on next login.",
+                    SVC, "resetPassword", [studentId], raw => {
+                        Prl.setText("#created-password", raw);
+                        Prl.$("#created-alert").classList.remove("d-none");
+                        reloadStudent();
+                    });
+            });
+
+            Prl.$("#btn-add-group").addEventListener("click", () => {
+                const gid = Prl.parseLong(Prl.val("#add-group-id"));
+                if (gid != null) ViewEngine.call(SVC, "addToGroup", [studentId, gid]).then(reloadStudent);
+            });
+
+            Prl.$("#btn-dismiss-created").addEventListener("click", () => {
+                Prl.$("#created-alert").classList.add("d-none");
+            });
+        </script>
+    </body>
+</html>

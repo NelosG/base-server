@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark" lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+        <title>My submissions</title>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
+        <script src="/js/prl-utils.js"></script>
+        <script src="/js/navbar.js"></script>
+    </head>
+    <body>
+
+        <div class="container mt-4">
+            <h3 class="mb-3"><i class="bi bi-cloud-upload"></i> My submissions</h3>
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0"
+                               data-prl-empty="#empty"
+                               data-prl-list="prl.mySubmissionsViewService.getMySubmissions"
+                               data-prl-row="myRow">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Assignment</th>
+                                    <th>MR</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Result</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="text-center text-muted p-3 d-none" id="empty">
+                        You have no submissions yet. Open a Merge Request in GitLab to trigger one.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function myRow(s) {
+                return Prl.submissionRow(s, {includeResultSummary: true});
+            }
+        </script>
+    </body>
+</html>

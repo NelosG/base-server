@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark" lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+        <title>Submissions</title>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
+        <script src="/js/prl-utils.js"></script>
+        <script src="/js/navbar.js"></script>
+    </head>
+    <body>
+
+        <div class="container mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="mb-0"><i class="bi bi-cloud-upload"></i> Submissions</h3>
+                <button class="btn btn-outline-primary btn-sm" id="refresh-btn" title="Refresh" type="button">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label" for="user-filter">Student</label>
+                            <select class="form-select" data-prl-args="[null]"
+                                    data-prl-label-fn="studentLabel"
+                                    data-prl-options="prl.studentViewService.getStudents"
+                                    id="user-filter">
+                                <option value="">All students</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="assignment-filter">Assignment</label>
+                            <select class="form-select" data-prl-label-fn="assignmentLabel"
+                                    data-prl-options="prl.assignmentViewService.getAssignments"
+                                    id="assignment-filter">
+                                <option value="">All assignments</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0"
+                               data-prl-args="filterArgs"
+                               data-prl-empty="#empty"
+                               data-prl-list="prl.submissionViewService.getSubmissions"
+                               data-prl-page-size="50"
+                               data-prl-paged="true"
+                               data-prl-reload-on="#user-filter:change,#assignment-filter:change,#refresh-btn:click"
+                               data-prl-row="submissionRow">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Student</th>
+                                    <th>Assignment</th>
+                                    <th>MR</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="text-center text-muted p-3 d-none" id="empty">No submissions.</div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function filterArgs() {
+                return [
+                    Prl.parseLong(Prl.val("#user-filter")),
+                    Prl.parseLong(Prl.val("#assignment-filter")),
+                ];
+            }
+
+            function submissionRow(s) {
+                return Prl.submissionRow(s, {includeStudent: true});
+            }
+
+            function studentLabel(s) {
+                return s.displayName || s.login || ("#" + s.id);
+            }
+
+            function assignmentLabel(a) {
+                return a.code + (a.name ? " - " + a.name : "");
+            }
+        </script>
+    </body>
+</html>

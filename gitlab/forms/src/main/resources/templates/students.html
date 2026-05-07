@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark" lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+        <title>Students</title>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
+        <script src="/js/prl-utils.js"></script>
+        <script src="/js/navbar.js"></script>
+    </head>
+    <body>
+
+        <div class="container mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="mb-0"><i class="bi bi-mortarboard"></i> Students</h3>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-secondary" href="#" id="btn-export-csv">
+                        <i class="bi bi-download"></i> Export CSV
+                    </a>
+                    <button class="btn btn-primary" id="btn-show-create">
+                        <i class="bi bi-plus-lg"></i> Create student
+                    </button>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <label class="form-label" for="group-filter">Group</label>
+                    <select class="form-select" data-prl-options="prl.studentGroupViewService.getGroups"
+                            id="group-filter">
+                        <option value="">All students</option>
+                        <option value="-1">- Without group -</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="card mb-3 d-none" id="create-card">
+                <div class="card-body">
+                    <h5 class="card-title">Create student</h5>
+                    <div class="alert d-none" id="create-alert"></div>
+                    <div class="mb-3">
+                        <label class="form-label" for="new-login">Login *</label>
+                        <input class="form-control" id="new-login" type="text">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="new-display-name">Display name</label>
+                        <input class="form-control" id="new-display-name" placeholder="Defaults to login" type="text">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="new-gitlab-name">GitLab username (optional)</label>
+                        <input class="form-control" id="new-gitlab-name" type="text">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="new-group-id">Group (optional)</label>
+                        <select class="form-select" data-prl-options="prl.studentGroupViewService.getGroups"
+                                id="new-group-id">
+                            <option value="">- None -</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-success"
+                            data-prl-alert="#create-alert"
+                            data-prl-args="createArgs"
+                            data-prl-form="prl.studentViewService.createStudent"
+                            data-prl-success="onCreated"
+                            data-prl-validate="validateCreate">Create
+                    </button>
+                    <button class="btn btn-outline-secondary" id="btn-cancel-create">Cancel</button>
+                </div>
+            </div>
+
+            <div class="alert alert-warning d-none" id="created-alert">
+                <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Student created - save this password</h6>
+                <p class="mb-2">The student must change the password on first login.</p>
+                <p class="mb-2">
+                    Login: <code id="created-login"></code><br>
+                    Password: <code id="created-password"></code>
+                </p>
+                <button class="btn btn-sm btn-outline-warning" id="btn-dismiss-created">Dismiss</button>
+            </div>
+
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0"
+                               data-prl-args="listArgs"
+                               data-prl-empty="#empty"
+                               data-prl-list="prl.studentViewService.getStudents"
+                               data-prl-reload-on="#group-filter:change"
+                               data-prl-row="studentRow">
+                            <thead>
+                                <tr>
+                                    <th>Login</th>
+                                    <th>Display name</th>
+                                    <th>GitLab</th>
+                                    <th>Groups</th>
+                                    <th>Submissions</th>
+                                    <th>Password</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="text-center text-muted p-3 d-none" id="empty">No students.</div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const SVC = "prl.studentViewService";
+
+            function listArgs() {
+                return [Prl.parseLong(Prl.val("#group-filter"))];
+            }
+
+            function validateCreate() {
+                return Prl.val("#new-login").trim() ? null : "Login is required";
+            }
+
+            function createArgs() {
+                return [{
+                    login: Prl.val("#new-login").trim(),
+                    displayName: Prl.val("#new-display-name").trim() || null,
+                    gitlabName: Prl.val("#new-gitlab-name").trim() || null,
+                    groupId: Prl.parseLong(Prl.val("#new-group-id")),
+                }];
+            }
+
+            function onCreated(student) {
+                Prl.$("#create-card").classList.add("d-none");
+                Prl.clearInputs("#create-card");
+                showCreated(student.login, student.initialPassword);
+                Prl.reloadList();
+            }
+
+            function showCreated(login, password) {
+                Prl.fillTexts({"#created-login": login, "#created-password": password});
+                Prl.$("#created-alert").classList.remove("d-none");
+                window.scrollTo({top: 0, behavior: "smooth"});
+            }
+
+            function studentRow(s) {
+                const tr = document.createElement("tr");
+                tr.appendChild(Prl.td(s.login || ""));
+                tr.appendChild(Prl.td(s.displayName || ""));
+                tr.appendChild(Prl.td(s.gitlabName || "-"));
+                tr.appendChild(Prl.td((s.groupNames || []).join(", ") || "-"));
+                tr.appendChild(Prl.td(String(s.submissionCount || 0)));
+                tr.appendChild(passwordCell(s));
+                tr.appendChild(actionsCell(s));
+                return tr;
+            }
+
+            function passwordCell(s) {
+                const td = document.createElement("td");
+                if (s.passwordStatus === "INITIAL") {
+                    td.appendChild(Prl.el("span", {className: "badge bg-warning text-dark", text: "Initial"}));
+                    if (s.initialPassword) {
+                        td.appendChild(document.createTextNode(" "));
+                        td.appendChild(Prl.el("code", {text: s.initialPassword}));
+                    }
+                } else {
+                    td.appendChild(Prl.el("span", {className: "badge bg-secondary", text: "Changed"}));
+                }
+                return td;
+            }
+
+            function actionsCell(s) {
+                const td = document.createElement("td");
+                td.appendChild(Prl.el("a", {
+                    className: "btn btn-sm btn-outline-secondary me-1",
+                    href: "/student?id=" + s.id, text: "Open",
+                }));
+                td.appendChild(Prl.el("button", {
+                    className: "btn btn-sm btn-outline-warning me-1", text: "Reset password",
+                    onClick: () => Prl.confirmCall("Reset password for '" + s.login + "'?",
+                        SVC, "resetPassword", [s.id], raw => {
+                            showCreated(s.login, raw);
+                            Prl.reloadList();
+                        }),
+                }));
+                td.appendChild(Prl.el("button", {
+                    className: "btn btn-sm btn-outline-danger", text: "Delete",
+                    onClick: () => Prl.confirmCall("Delete student '" + s.login + "' and ALL their submissions?",
+                        SVC, "deleteStudent", [s.id], () => Prl.reloadList()),
+                }));
+                return td;
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                Prl.$("#btn-show-create").addEventListener("click", () => Prl.$("#create-card").classList.toggle("d-none"));
+                Prl.$("#btn-cancel-create").addEventListener("click", () => Prl.$("#create-card").classList.add("d-none"));
+                Prl.$("#btn-dismiss-created").addEventListener("click", () => Prl.$("#created-alert").classList.add("d-none"));
+                Prl.$("#btn-export-csv").addEventListener("click", ev => {
+                    ev.preventDefault();
+                    const raw = Prl.val("#group-filter");
+                    window.location.href = "/api/students/export.csv" + (raw === "" ? "" : "?groupId=" + encodeURIComponent(raw));
+                });
+            });
+        </script>
+    </body>
+</html>

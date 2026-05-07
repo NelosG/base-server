@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark" lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+        <title>Student Groups</title>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
+        <script src="/js/prl-utils.js"></script>
+        <script src="/js/navbar.js"></script>
+    </head>
+    <body>
+
+        <div class="container mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="mb-0"><i class="bi bi-people"></i> Student Groups</h3>
+                <button class="btn btn-primary" id="btn-show-create">
+                    <i class="bi bi-plus-lg"></i> New group
+                </button>
+            </div>
+
+            <div class="card mb-3 d-none" id="form-card">
+                <div class="card-body">
+                    <h5 class="card-title" id="form-title">New group</h5>
+                    <div class="alert d-none" id="form-alert"></div>
+
+                    <input id="group-id" type="hidden">
+                    <div class="mb-3">
+                        <label class="form-label" for="group-name">Name *</label>
+                        <input class="form-control" id="group-name" type="text">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="group-description">Description</label>
+                        <input class="form-control" id="group-description" type="text">
+                    </div>
+
+                    <h6>Members</h6>
+                    <ul class="list-group mb-2" id="members-list"></ul>
+                    <div class="input-group mb-3">
+                        <input class="form-control" id="add-gitlab-name" placeholder="GitLab username" type="text">
+                        <input class="form-control" id="add-display-name" placeholder="Display name (optional)"
+                               type="text">
+                        <button class="btn btn-outline-primary" id="btn-add-member">Add</button>
+                    </div>
+
+                    <button class="btn btn-success"
+                            data-prl-alert="#form-alert"
+                            data-prl-args="saveArgs"
+                            data-prl-form="prl.studentGroupViewService.saveGroup"
+                            data-prl-success="onSaved"
+                            data-prl-validate="validateGroup">Save
+                    </button>
+                    <button class="btn btn-outline-danger d-none" id="btn-delete">Delete</button>
+                    <button class="btn btn-outline-secondary" id="btn-cancel">Cancel</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0"
+                               data-prl-empty="#empty"
+                               data-prl-list="prl.studentGroupViewService.getGroups"
+                               data-prl-row="groupRow">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Members</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="text-center text-muted p-3 d-none" id="empty">No groups.</div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const SVC = "prl.studentGroupViewService";
+            let members = [];   // [{gitlabName, displayName}]
+
+            function groupRow(g) {
+                const tr = document.createElement("tr");
+                tr.appendChild(Prl.td(g.name || ""));
+                tr.appendChild(Prl.td(g.description || ""));
+                tr.appendChild(Prl.td(String(g.memberCount || 0)));
+                const td = document.createElement("td");
+                td.appendChild(Prl.el("button", {
+                    className: "btn btn-sm btn-outline-secondary me-1", text: "Edit",
+                    onClick: () => openForm(g),
+                }));
+                tr.appendChild(td);
+                return tr;
+            }
+
+            function openForm(group) {
+                Prl.fillTexts({"#form-title": group ? ("Edit: " + group.name) : "New group"});
+                Prl.$("#group-id").value = group?.id || "";
+                Prl.$("#group-name").value = group?.name || "";
+                Prl.$("#group-description").value = group?.description || "";
+                members = (group?.members || []).map(m => ({
+                    gitlabName: m.gitlabName,
+                    displayName: m.displayName || ""
+                }));
+                renderMembers();
+                Prl.$("#form-card").classList.remove("d-none");
+                Prl.$("#btn-delete").classList.toggle("d-none", !group);
+            }
+
+            function closeForm() {
+                Prl.$("#form-card").classList.add("d-none");
+                members = [];
+            }
+
+            function renderMembers() {
+                const ul = Prl.$("#members-list");
+                ul.replaceChildren();
+                if (members.length === 0) {
+                    ul.appendChild(Prl.el("li", {className: "list-group-item text-muted", text: "No members yet"}));
+                    return;
+                }
+                members.forEach((m, idx) => {
+                    const li = Prl.el("li", {className: "list-group-item d-flex justify-content-between align-items-center"});
+                    li.appendChild(Prl.el("span", {text: m.gitlabName + (m.displayName ? " (" + m.displayName + ")" : "")}));
+                    li.appendChild(Prl.el("button", {
+                        className: "btn btn-sm btn-outline-danger", text: "Remove",
+                        onClick: () => {
+                            members.splice(idx, 1);
+                            renderMembers();
+                        },
+                    }));
+                    ul.appendChild(li);
+                });
+            }
+
+            function addMember() {
+                const gitlabName = Prl.val("#add-gitlab-name").trim();
+                const displayName = Prl.val("#add-display-name").trim();
+                if (!gitlabName) return;
+                if (members.some(m => m.gitlabName === gitlabName)) {
+                    Prl.alert("#form-alert", "warning", "User '" + gitlabName + "' already added");
+                    return;
+                }
+                members.push({gitlabName, displayName});
+                Prl.$("#add-gitlab-name").value = "";
+                Prl.$("#add-display-name").value = "";
+                renderMembers();
+            }
+
+            function validateGroup() {
+                return Prl.val("#group-name").trim() ? null : "Name is required";
+            }
+
+            function saveArgs() {
+                const id = Prl.val("#group-id");
+                return [{
+                    id: id ? parseInt(id, 10) : null,
+                    name: Prl.val("#group-name").trim(),
+                    description: Prl.val("#group-description").trim() || null,
+                    members: members,
+                }];
+            }
+
+            function onSaved() {
+                closeForm();
+                Prl.reloadList();
+            }
+
+            function deleteGroup() {
+                const id = Prl.val("#group-id");
+                if (!id) return;
+                Prl.confirmCall("Delete this group?", SVC, "deleteGroup", [parseInt(id, 10)],
+                    () => {
+                        closeForm();
+                        Prl.reloadList();
+                    });
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                Prl.$("#btn-show-create").addEventListener("click", () => openForm(null));
+                Prl.$("#btn-cancel").addEventListener("click", closeForm);
+                Prl.$("#btn-add-member").addEventListener("click", addMember);
+                Prl.$("#btn-delete").addEventListener("click", deleteGroup);
+            });
+        </script>
+    </body>
+</html>
