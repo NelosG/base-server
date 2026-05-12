@@ -63,6 +63,8 @@
 
         <fasterxml.jackson-databind.version>2.19.2</fasterxml.jackson-databind.version>
 
+        <caffeine.version>3.2.0</caffeine.version>
+
         <!-- TESTS -->
         <junit-jupiter.version>5.13.4</junit-jupiter.version>
         <mockito-kotlin.version>6.0.0</mockito-kotlin.version>
@@ -224,6 +226,9 @@
     <profiles>
         <profile>
             <id>dev</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
             <build>
                 <pluginManagement>
                     <plugins>
@@ -297,13 +302,6 @@
 
 
     <dependencies>
-        <!-- SPRING -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-devtools</artifactId>
-            <version>${spring.boot.version}</version>
-            <optional>true</optional>
-        </dependency>
         <!-- KOTLIN -->
         <dependency>
             <groupId>org.jetbrains.kotlinx</groupId>
@@ -539,6 +537,13 @@
                 <artifactId>mockito-kotlin</artifactId>
                 <version>${mockito-kotlin.version}</version>
                 <scope>test</scope>
+            </dependency>
+
+            <!-- Caffeine in-process cache (used for adapter-test result polling) -->
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

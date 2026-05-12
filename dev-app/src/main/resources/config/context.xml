@@ -15,14 +15,34 @@
         <property name="username" value="guest"/>
         <property name="password" value="guest"/>
 
-        <!-- Настройки пула соединений -->
+        <!-- Pool sizing. -->
         <property name="connectionTimeout" value="30000"/>
         <property name="maximumPoolSize" value="10"/>
         <property name="minimumIdle" value="2"/>
-        <property name="idleTimeout" value="120000"/>
-        <property name="maxLifetime" value="300000"/>
+        <!--
+            Lifetimes tuned for remote-PostgreSQL where a NAT/firewall on the
+            path closes idle TCP earlier than HikariCP can keep it alive on
+            its own. maxLifetime=120000 (2 min) recycles every connection
+            well before typical NAT-side timeouts, so the "Failed to
+            validate connection ... Possibly consider using a shorter
+            maxLifetime" warning stays quiet. keepaliveTime=30000 (HikariCP
+            minimum) is the safety net for whatever idle window remains
+            inside that 2 minutes.
+
+            connectionTestQuery is intentionally omitted - the PostgreSQL
+            JDBC driver is JDBC4-compliant, so HikariCP uses
+            Connection.isValid() which is cheaper than running an explicit
+            SELECT 1. The HikariCP wiki recommends NOT setting
+            connectionTestQuery in that case.
+
+            tcpKeepAlive=true below is mostly a no-op on Windows - the OS
+            default keepalive interval is 2 hours, which requires a
+            registry edit + reboot to lower. We rely on HikariCP's
+            app-level keepalive + aggressive maxLifetime instead.
+        -->
+        <property name="idleTimeout" value="60000"/>
+        <property name="maxLifetime" value="120000"/>
         <property name="keepaliveTime" value="30000"/>
-        <property name="connectionTestQuery" value="SELECT 1"/>
 
         <!-- Оптимизация для PostgreSQL -->
         <property name="dataSourceProperties">

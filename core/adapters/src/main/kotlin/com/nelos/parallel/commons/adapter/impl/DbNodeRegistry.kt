@@ -10,6 +10,7 @@ import com.nelos.parallel.commons.adapter.vo.NodeInfo
 import com.nelos.parallel.commons.adapter.vo.findHttpConfig
 import com.nelos.parallel.commons.adapter.vo.findTransport
 import com.nelos.parallel.commons.adapter.vo.response.TransportConfig
+import com.nelos.parallel.commons.adapter.vo.response.TransportInfo
 import com.nelos.parallel.commons.service.TxAfterCommit
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -155,12 +156,29 @@ class DbNodeRegistry(
         TxAfterCommit.runAfterCommit { invalidateCache() }
     }
 
+    /**
+     * Merge an incoming [NodeInfo] into this entity. Null fields on the incoming
+     * side are NOT propagated - they preserve whatever the entity already has.
+     * Transports merge per [TransportType]: incoming entries override same-type
+     * entries already on the entity, other types are kept. Explicit transport
+     * removal goes through [removeTransport].
+     */
     private fun Node.applyFrom(node: NodeInfo) {
         nodeId = node.nodeId
-        capabilities = node.capabilities
-        transports = node.transports
-        resourceProviders = node.resourceProviders
+        capabilities = node.capabilities ?: capabilities
+        transports = mergeTransports(transports, node.transports)
+        resourceProviders = node.resourceProviders ?: resourceProviders
         registeredAt = node.registeredAt
+    }
+
+    private fun mergeTransports(
+        existing: List<TransportInfo>?,
+        incoming: List<TransportInfo>?,
+    ): List<TransportInfo>? {
+        if (incoming.isNullOrEmpty()) return existing
+        val byType = (existing ?: emptyList()).associateBy { it.type }.toMutableMap()
+        incoming.forEach { byType[it.type] = it }
+        return byType.values.toList()
     }
 
     private fun Node.toNodeInfo(): NodeInfo = NodeInfo(

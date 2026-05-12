@@ -4,10 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.nelos.parallel.commons.adapter.NodeAdapter
 import com.nelos.parallel.commons.adapter.NodeAdapterRegistry
 import com.nelos.parallel.commons.adapter.NodeRegistry
+import com.nelos.parallel.commons.adapter.NodeTransportManager
 import com.nelos.parallel.commons.adapter.enums.AdapterStatus
 import com.nelos.parallel.commons.adapter.enums.SourceType
 import com.nelos.parallel.commons.adapter.enums.TransportType
-import com.nelos.parallel.commons.adapter.service.NodeService
 import com.nelos.parallel.commons.adapter.vo.NodeInfo
 import com.nelos.parallel.commons.adapter.vo.request.ProgressEvent
 import com.nelos.parallel.commons.adapter.vo.request.SourceDescriptor
@@ -52,7 +52,7 @@ class PipelineServiceImpl(
     private val jobService: JobService,
     private val studentResolver: GitlabStudentResolver,
     private val nodeRegistry: NodeRegistry,
-    private val nodeService: NodeService,
+    private val transportManager: NodeTransportManager,
     private val adapterRegistry: NodeAdapterRegistry,
     private val objectMapper: ObjectMapper,
     @param:Value("\${gitlab.api.token:}") private val gitlabApiToken: String,
@@ -317,23 +317,23 @@ class PipelineServiceImpl(
             return Triple(amqpNodes.first(), amqpAdapter, TransportType.AMQP)
         }
 
-        // Fall back to HTTP with lazy ping
+        // Fall back to HTTP with lazy ping. Failures strip only the HTTP transport;
+        // a sibling AMQP transport (if any) is preserved so the next dispatch can
+        // still reach the same engine over Rabbit.
         val httpAdapter = adapterRegistry.findAdapter(TransportType.HTTP) ?: return null
-        val deadIds = mutableListOf<Long>()
+        val deadIds = mutableListOf<String>()
         var live: NodeInfo? = null
         for (candidate in httpNodes) {
             if (httpAdapter.healthCheck(candidate)) {
                 live = candidate
                 break
             }
-            nodeService.findByNodeId(candidate.nodeId)?.id?.let { deadIds.add(it) }
+            deadIds.add(candidate.nodeId)
         }
         if (deadIds.isNotEmpty()) {
-            val removed = nodeService.deleteByIds(deadIds)
-            LOG.info("Lazy validation removed {} dead HTTP node(s)", removed)
-            submissionLogger.appendOne(submissionId, "[parallel] Removed $removed unresponsive HTTP node(s)")
-            // We bypassed DbNodeRegistry for the DELETE, so its TTL cache still has the stale rows.
-            nodeRegistry.invalidateCache()
+            deadIds.forEach { transportManager.handleHealthCheckFailure(it, TransportType.HTTP) }
+            LOG.info("Lazy validation stripped HTTP transport from {} unresponsive node(s)", deadIds.size)
+            submissionLogger.appendOne(submissionId, "[parallel] Removed HTTP from ${deadIds.size} unresponsive node(s)")
         }
         return live?.let { Triple(it, httpAdapter, TransportType.HTTP) }
     }

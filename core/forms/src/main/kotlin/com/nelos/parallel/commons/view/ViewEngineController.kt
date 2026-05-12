@@ -8,6 +8,7 @@ import com.nelos.parallel.commons.view.vo.ViewResponse
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.NoSuchBeanDefinitionException
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
 import org.springframework.core.annotation.AnnotationUtils
@@ -30,6 +31,11 @@ class ViewEngineController @Autowired constructor(
     private val objectMapper: ObjectMapper,
 ) {
 
+    /** Whitelist of all bean names declared with `@ViewService` - built lazily on first use. */
+    private val viewServiceBeanNames: Set<String> by lazy {
+        applicationContext.getBeansWithAnnotation(ViewService::class.java).keys.toSet()
+    }
+
     /**
      * Invokes the method specified in [request] on the target view service bean.
      */
@@ -40,11 +46,24 @@ class ViewEngineController @Autowired constructor(
         response: HttpServletResponse,
     ): ResponseEntity<ViewResponse> {
         return try {
-            val bean = applicationContext.getBean(request.service)
+            // Look the bean up only if it was registered as a @ViewService at startup.
+            // Hitting `applicationContext.getBean` directly with arbitrary input would
+            // let a caller probe Spring bean names by reading the NoSuchBeanDefinitionException
+            // message echoed back in the response.
+            if (request.service !in viewServiceBeanNames) {
+                return ResponseEntity.badRequest()
+                    .body(ViewResponse.error("Unknown view service"))
+            }
+            val bean = try {
+                applicationContext.getBean(request.service)
+            } catch (e: NoSuchBeanDefinitionException) {
+                return ResponseEntity.badRequest()
+                    .body(ViewResponse.error("Unknown view service"))
+            }
 
             val annotation = AnnotationUtils.findAnnotation(bean::class.java, ViewService::class.java)
                 ?: return ResponseEntity.badRequest()
-                    .body(ViewResponse.error("Bean '${request.service}' is not a @ViewService"))
+                    .body(ViewResponse.error("Unknown view service"))
 
             if (!annotation.public && !isAuthenticated()) {
                 return ResponseEntity.status(401)
