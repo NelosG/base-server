@@ -41,6 +41,17 @@ interface Dao<T : Entity> {
     fun findByCondition(conditions: TerFunction<CriteriaBuilder, CriteriaQuery<T>, Root<T>, Predicate>): List<T>
 
     /**
+     * Returns entities matching the given [conditions] with a `SELECT ... FOR UPDATE`
+     * row lock acquired on each result row. The lock is held until the surrounding
+     * transaction commits - concurrent writers on the same rows block here.
+     *
+     * Must be called inside a writable transaction.
+     *
+     * @param conditions JPA criteria predicate
+     */
+    fun findByConditionForUpdate(conditions: TerFunction<CriteriaBuilder, CriteriaQuery<T>, Root<T>, Predicate>): List<T>
+
+    /**
      * Persists or merges the given [entity] and returns the managed instance.
      */
     fun save(entity: T): T

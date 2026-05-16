@@ -10,6 +10,8 @@ import org.springframework.security.core.userdetails.UserDetailsService
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * Loads users for Spring Security and owns the password lifecycle (creation with a one-time
@@ -64,8 +66,11 @@ class UserDetailsProviderService(
      * Generates and applies a fresh random password for the given user. Used by admins to
      * unblock a user who lost their password - re-arms the OTP flow.
      */
+    @Transactional(propagation = Propagation.REQUIRED)
     fun resetPassword(userId: Long): String {
-        val user = users.tryFindById(userId)
+        // FOR UPDATE so a concurrent user-driven changePassword on the same row
+        // doesn't race and overwrite our admin reset (or vice versa).
+        val user = users.tryFindByIdForUpdate(userId)
             ?: throw UsernameNotFoundException("User with id $userId not found")
         val raw = RandomPasswordGenerator.generate()
         user.encryptedPassword = BCryptPasswordEncoder().encode(raw)
@@ -81,8 +86,11 @@ class UserDetailsProviderService(
      * Changes the password of the user identified by [login], clears the one-time-password
      * fields in `properties`, and lifts the password-change requirement.
      */
+    @Transactional(propagation = Propagation.REQUIRED)
     fun changePassword(login: String, newPassword: String) {
-        val user = users.findByLogin(login)
+        // FOR UPDATE so an admin resetPassword fired at the same instant
+        // can't clobber the user's new password (or vice versa).
+        val user = users.findByLoginForUpdate(login)
             ?: throw UsernameNotFoundException("User with login $login not found")
         user.encryptedPassword = BCryptPasswordEncoder().encode(newPassword)
         user.properties?.let {

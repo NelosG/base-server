@@ -4,13 +4,13 @@ import com.nelos.parallel.auth.service.UserService
 import com.nelos.parallel.commons.security.AppRole
 import com.nelos.parallel.commons.view.service.ViewService
 import com.nelos.parallel.gitlab.client.GitLabApiClient
-import org.slf4j.LoggerFactory
-import com.nelos.parallel.gitlab.entity.Assignment
 import com.nelos.parallel.gitlab.forms.vo.*
-import com.nelos.parallel.gitlab.service.AssignmentService
 import com.nelos.parallel.gitlab.service.GitlabUserService
-import com.nelos.parallel.gitlab.service.StudentGroupMemberService
-import com.nelos.parallel.gitlab.service.StudentGroupService
+import com.nelos.parallel.pipeline.data.entity.Assignment
+import com.nelos.parallel.pipeline.data.service.AssignmentService
+import com.nelos.parallel.pipeline.data.service.StudentGroupMemberService
+import com.nelos.parallel.pipeline.data.service.StudentGroupService
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 
 /**
@@ -57,6 +57,14 @@ class AssignmentViewService(
         assignment.cpuTimeSec = data.cpuTimeSec ?: assignment.cpuTimeSec
         assignment.maxProcesses = data.maxProcesses ?: assignment.maxProcesses
         data.active?.let { assignment.active = it }
+        // Verdict script: explicit clear takes priority (instructor removed the
+        // script); otherwise a non-null payload replaces the existing one, and
+        // a null payload leaves the current script untouched (partial update).
+        if (data.clearEvaluatorScript == true) {
+            assignment.evaluatorScript = null
+        } else if (data.evaluatorScript != null) {
+            assignment.evaluatorScript = data.evaluatorScript
+        }
 
         return assignmentService.save(assignment).toView()
     }
@@ -193,6 +201,7 @@ class AssignmentViewService(
         cpuTimeSec = cpuTimeSec,
         maxProcesses = maxProcesses,
         active = active,
+        evaluatorScript = evaluatorScript,
     )
 
     companion object {

@@ -24,6 +24,11 @@ abstract class GenericServiceImpl<T : AbstractEntity, DAO : GenericDao<T>> :
     }
 
     @Transactional(propagation = Propagation.REQUIRED)
+    override fun tryFindByIdForUpdate(id: Long): T? {
+        return invokeDaoMethod { it.tryFindByIdForUpdate(id) }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED)
     override fun remove(ids: List<Long>) {
         ids.forEach(::remove)
     }

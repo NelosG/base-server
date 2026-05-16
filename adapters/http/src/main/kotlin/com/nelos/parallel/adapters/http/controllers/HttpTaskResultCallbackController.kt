@@ -2,7 +2,7 @@ package com.nelos.parallel.adapters.http.controllers
 
 import com.nelos.parallel.commons.adapter.listener.TaskResultListenerRegistry
 import com.nelos.parallel.commons.adapter.vo.response.TaskResult
-import com.nelos.parallel.gitlab.pipeline.service.PipelineService
+import com.nelos.parallel.pipeline.commons.service.PipelineService
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity

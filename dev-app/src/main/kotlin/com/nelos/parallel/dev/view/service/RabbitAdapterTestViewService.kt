@@ -1,7 +1,7 @@
 package com.nelos.parallel.dev.view.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.nelos.parallel.adapters.rabbit.RabbitNodeAdapter
+import com.nelos.parallel.commons.adapter.NodeAdapter
 import com.nelos.parallel.commons.adapter.NodeRegistry
 import com.nelos.parallel.commons.adapter.NodeTransportManager
 import com.nelos.parallel.commons.adapter.enums.TransportType
@@ -12,6 +12,7 @@ import com.nelos.parallel.dev.view.vo.NodeView
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Qualifier
 
 /**
  * Test view service for RabbitMQ adapter - allows interacting with C-tests-runner nodes via AMQP.
@@ -25,7 +26,7 @@ class RabbitAdapterTestViewService @Autowired constructor(
     objectMapper: ObjectMapper,
     listenerRegistry: TaskResultListenerRegistry,
     transportManager: NodeTransportManager,
-    override val adapter: RabbitNodeAdapter,
+    @Qualifier("prl.rabbitNodeAdapter") override val adapter: NodeAdapter,
 ) : AbstractAdapterTestViewService(nodeRegistry, objectMapper, listenerRegistry, transportManager) {
 
     override val transportType: TransportType = TransportType.AMQP
@@ -33,30 +34,17 @@ class RabbitAdapterTestViewService @Autowired constructor(
     override val log: Logger = LOG
 
     /**
-     * AMQP runners do not push lifecycle events - they reply to a `statusRequest`
-     * fanout broadcast. Refresh therefore performs an on-demand discovery sweep:
-     * registered AMQP nodes that don't reply within the timeout are evicted, and
-     * any new responders are persisted into the registry so the pipeline can
-     * dispatch to them.
+     * AMQP runners don't push lifecycle events - discovery is on-demand via a
+     * `statusRequest` fanout. Delegated to [NodeTransportManager.discoverAndRefresh]
+     * so the pipeline submit path can trigger the same flow when its registry
+     * snapshot has no live AMQP nodes.
      */
     override fun refreshAndPruneNodes(): List<NodeView> {
-        val discovered = adapter.discoverNodes(DISCOVERY_TIMEOUT_MS)
-        val responding = discovered.map { it.nodeId }.toSet()
-        log.info("AMQP discovery: {} node(s) replied", discovered.size)
-
-        nodeRegistry.findByTransport(TransportType.AMQP)
-            .filter { it.nodeId !in responding }
-            .forEach { stale ->
-                transportManager.handleHealthCheckFailure(stale.nodeId, TransportType.AMQP)
-                log.info("AMQP node did not respond to discovery: {}", stale.nodeId)
-            }
-
-        discovered.forEach { nodeRegistry.register(it) }
+        transportManager.discoverAndRefresh(TransportType.AMQP)
         return getNodes()
     }
 
     companion object {
         private val LOG = LoggerFactory.getLogger(RabbitAdapterTestViewService::class.java)
-        private const val DISCOVERY_TIMEOUT_MS = 2000L
     }
 }

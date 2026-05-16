@@ -10,4 +10,11 @@ import com.nelos.parallel.commons.dao.GenericDao
 interface UserDao : GenericDao<User> {
 
     fun findByLogin(login: String): User?
+
+    /**
+     * Same as [findByLogin] but acquires a `SELECT ... FOR UPDATE` row lock.
+     * Use in password-change / profile-edit flows where concurrent writers on
+     * the same user must serialize. Must run inside a writable transaction.
+     */
+    fun findByLoginForUpdate(login: String): User?
 }

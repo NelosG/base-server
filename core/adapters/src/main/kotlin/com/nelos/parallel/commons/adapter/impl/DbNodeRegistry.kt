@@ -49,7 +49,12 @@ class DbNodeRegistry(
     @Transactional(propagation = Propagation.REQUIRED)
     override fun register(node: NodeInfo): NodeInfo {
         evictByEndpoint(node)
-        val existing = nodeService.findByNodeId(node.nodeId)
+        // SELECT ... FOR UPDATE: a concurrent register / removeTransport /
+        // updateNode on the same nodeId blocks here until our tx commits,
+        // so the merge below sees a stable snapshot and writes can't be
+        // lost. First-ever insert (existing == null) is still racy on the
+        // unique constraint; that path is rare and the adapter will retry.
+        val existing = nodeService.findByNodeIdForUpdate(node.nodeId)
         if (existing != null) {
             val existingAt = existing.registeredAt ?: Instant.EPOCH
             if (node.registeredAt.isBefore(existingAt)) {
@@ -89,7 +94,7 @@ class DbNodeRegistry(
         nodeService.findByNodeId(nodeId)?.toNodeInfo()
 
     override fun findAll(): List<NodeInfo> =
-        // nodeService.findAll() is itself @Transactional(SUPPORTS, readOnly) via GenericServiceImpl,
+    // nodeService.findAll() is itself @Transactional(SUPPORTS, readOnly) via GenericServiceImpl,
         // so the cache loader doesn't need its own transactional boundary.
         listCache.get(ALL_KEY) { nodeService.findAll().map { it.toNodeInfo() } }
 
@@ -102,7 +107,7 @@ class DbNodeRegistry(
 
     @Transactional(propagation = Propagation.REQUIRED)
     override fun removeTransport(nodeId: String, transportType: TransportType): NodeInfo? {
-        val entity = nodeService.findByNodeId(nodeId) ?: return null
+        val entity = nodeService.findByNodeIdForUpdate(nodeId) ?: return null
         val updatedTransports = entity.transports?.filter { it.type != transportType }
         if (updatedTransports.isNullOrEmpty()) {
             nodeService.remove(entity)
@@ -119,7 +124,7 @@ class DbNodeRegistry(
 
     @Transactional(propagation = Propagation.REQUIRED)
     override fun updateNode(node: NodeInfo): NodeInfo {
-        val existing = nodeService.findByNodeId(node.nodeId)
+        val existing = nodeService.findByNodeIdForUpdate(node.nodeId)
         val entity = existing ?: Node()
         entity.applyFrom(node)
         val saved = nodeService.save(entity).toNodeInfo()

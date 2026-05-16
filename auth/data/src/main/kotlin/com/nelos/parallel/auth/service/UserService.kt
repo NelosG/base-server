@@ -10,4 +10,10 @@ import com.nelos.parallel.commons.service.GenericService
 interface UserService : GenericService<User> {
 
     fun findByLogin(login: String): User?
+
+    /**
+     * Same as [findByLogin] but acquires a `SELECT ... FOR UPDATE` row lock.
+     * Must run inside a writable transaction.
+     */
+    fun findByLoginForUpdate(login: String): User?
 }

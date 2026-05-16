@@ -192,7 +192,10 @@ function attachProjectSearch(inputEl, resultsEl, onSelect) {
                 e.preventDefault();
                 pick(p);
             });
-            item.addEventListener("mouseenter", function () { selectedIdx = i; highlight(); });
+            item.addEventListener("mouseenter", function () {
+                selectedIdx = i;
+                highlight();
+            });
             resultsEl.appendChild(item);
         });
         selectedIdx = -1;
@@ -238,7 +241,10 @@ function attachProjectSearch(inputEl, resultsEl, onSelect) {
             selectedIdx = Math.max(selectedIdx - 1, 0);
             highlight();
         } else if (e.key === "Enter") {
-            if (selectedIdx >= 0) { e.preventDefault(); pick(currentResults[selectedIdx]); }
+            if (selectedIdx >= 0) {
+                e.preventDefault();
+                pick(currentResults[selectedIdx]);
+            }
         } else if (e.key === "Escape") {
             close();
         }
@@ -260,16 +266,21 @@ function loadBranches(formEl, projectPath) {
     var select = formEl.querySelector(".branch-select");
     select.textContent = "";
     if (!projectPath) {
-        var ph = document.createElement("option"); ph.textContent = "Select test project first";
+        var ph = document.createElement("option");
+        ph.textContent = "Select test project first";
         select.appendChild(ph);
         return Promise.resolve();
     }
-    var loading = document.createElement("option"); loading.textContent = "Loading..."; loading.disabled = true;
+    var loading = document.createElement("option");
+    loading.textContent = "Loading...";
+    loading.disabled = true;
     select.appendChild(loading);
     return ViewEngine.call(SERVICE, "getProjectBranches", [projectPath]).then(function (branches) {
         select.textContent = "";
         if (!branches || branches.length === 0) {
-            var d = document.createElement("option"); d.value = "main"; d.textContent = "main (default)";
+            var d = document.createElement("option");
+            d.value = "main";
+            d.textContent = "main (default)";
             select.appendChild(d);
             return;
         }
@@ -282,7 +293,9 @@ function loadBranches(formEl, projectPath) {
         });
     }).catch(function () {
         select.textContent = "";
-        var e = document.createElement("option"); e.value = "main"; e.textContent = "main";
+        var e = document.createElement("option");
+        e.value = "main";
+        e.textContent = "main";
         select.appendChild(e);
     });
 }
@@ -298,69 +311,106 @@ function buildAssignmentForm(title, a) {
     // listeners afterwards. Earlier `card.appendChild(headerWithListener)` +
     // `card.innerHTML += '<body>...'` serialised/reparsed the card and silently
     // dropped the close-button's click listener - the x was dead on every form.
-    var idVal     = esc(a.id);
-    var pathVal   = esc(a.gitlabProjectPath);
-    var testVal   = esc(a.testRepoUrl);
-    var codeVal   = esc(a.code);
-    var nameVal   = esc(a.name);
-    var descVal   = esc(a.description);
-    var memVal    = esc(a.memoryLimitMb);
+    var idVal = esc(a.id);
+    var pathVal = esc(a.gitlabProjectPath);
+    var testVal = esc(a.testRepoUrl);
+    var codeVal = esc(a.code);
+    var nameVal = esc(a.name);
+    var descVal = esc(a.description);
+    var memVal = esc(a.memoryLimitMb);
     var threadVal = esc(a.threads);
-    var wallVal   = esc(a.wallTimeSec);
-    var cpuVal    = esc(a.cpuTimeSec);
-    var procVal   = esc(a.maxProcesses);
+    var wallVal = esc(a.wallTimeSec);
+    var cpuVal = esc(a.cpuTimeSec);
+    var procVal = esc(a.maxProcesses);
 
     card.innerHTML =
         '<div class="card-header d-flex justify-content-between">' +
-            '<span class="form-title"></span>' +
-            '<button class="btn-close close-form-btn" type="button"></button>' +
+        '<span class="form-title"></span>' +
+        '<button class="btn-close close-form-btn" type="button"></button>' +
         '</div>' +
         '<div class="card-body">' +
-            '<input type="hidden" class="form-id" value="' + idVal + '">' +
-            '<input type="hidden" class="form-gitlabProjectPath" value="' + pathVal + '">' +
-            '<input type="hidden" class="form-testRepoUrl" value="' + testVal + '">' +
-            '<input type="hidden" class="form-testProjectPath" value="">' +
-            '<input type="hidden" class="form-code" value="' + codeVal + '">' +
-            '<input type="hidden" class="form-name" value="' + nameVal + '">' +
-            '<div class="row">' +
-                '<div class="col-md-6 mb-3 position-relative"><label class="form-label">Solution Project</label>' +
-                    '<input class="form-control project-search" type="text" placeholder="Type to search projects..." autocomplete="off" value="' + pathVal + '">' +
-                    '<div class="dropdown-menu w-100 project-results" style="max-height:280px;overflow-y:auto;"></div>' +
-                '</div>' +
-                '<div class="col-md-6 mb-3 position-relative"><label class="form-label">Test Project</label>' +
-                    '<input class="form-control test-project-search" type="text" placeholder="Type to search projects..." autocomplete="off">' +
-                    '<div class="dropdown-menu w-100 test-project-results" style="max-height:280px;overflow-y:auto;"></div>' +
-                '</div>' +
-            '</div>' +
-            '<div class="mb-3"><label class="form-label">Description</label>' +
-                '<textarea class="form-control form-description" rows="2">' + descVal + '</textarea></div>' +
-            '<div class="row">' +
-                '<div class="col-md-6 mb-3"><label class="form-label">Test Branch</label>' +
-                    '<select class="form-select branch-select"><option>Select test project</option></select></div>' +
-                '<div class="col-md-3 mb-3"><label class="form-label">Memory (MB)</label>' +
-                    '<input class="form-control form-memoryLimitMb" type="number" placeholder="1024" value="' + memVal + '"></div>' +
-                '<div class="col-md-3 mb-3"><label class="form-label">Threads</label>' +
-                    '<input class="form-control form-threads" type="number" placeholder="4" value="' + threadVal + '"></div>' +
-            '</div>' +
-            '<div class="row">' +
-                '<div class="col-md-4 mb-3"><label class="form-label">Wall (s)</label>' +
-                    '<input class="form-control form-wallTimeSec" type="number" placeholder="60" value="' + wallVal + '"></div>' +
-                '<div class="col-md-4 mb-3"><label class="form-label">CPU (s)</label>' +
-                    '<input class="form-control form-cpuTimeSec" type="number" placeholder="30" value="' + cpuVal + '"></div>' +
-                '<div class="col-md-4 mb-3"><label class="form-label">Max Processes</label>' +
-                    '<input class="form-control form-maxProcesses" type="number" placeholder="threads x multiplier" value="' + procVal + '"></div>' +
-            '</div>' +
-            '<div class="mb-3 form-check">' +
-                '<input class="form-check-input form-active" type="checkbox"' + (a.active !== false ? ' checked' : '') + '>' +
-                '<label class="form-check-label">Active</label></div>' +
-            '<button class="btn btn-primary save-btn">Save</button>' +
+        '<input type="hidden" class="form-id" value="' + idVal + '">' +
+        '<input type="hidden" class="form-gitlabProjectPath" value="' + pathVal + '">' +
+        '<input type="hidden" class="form-testRepoUrl" value="' + testVal + '">' +
+        '<input type="hidden" class="form-testProjectPath" value="">' +
+        '<input type="hidden" class="form-code" value="' + codeVal + '">' +
+        '<input type="hidden" class="form-name" value="' + nameVal + '">' +
+        '<div class="row">' +
+        '<div class="col-md-6 mb-3 position-relative"><label class="form-label">Solution Project</label>' +
+        '<input class="form-control project-search" type="text" placeholder="Type to search projects..." autocomplete="off" value="' + pathVal + '">' +
+        '<div class="dropdown-menu w-100 project-results" style="max-height:280px;overflow-y:auto;"></div>' +
+        '</div>' +
+        '<div class="col-md-6 mb-3 position-relative"><label class="form-label">Test Project</label>' +
+        '<input class="form-control test-project-search" type="text" placeholder="Type to search projects..." autocomplete="off">' +
+        '<div class="dropdown-menu w-100 test-project-results" style="max-height:280px;overflow-y:auto;"></div>' +
+        '</div>' +
+        '</div>' +
+        '<div class="mb-3"><label class="form-label">Description</label>' +
+        '<textarea class="form-control form-description" rows="2">' + descVal + '</textarea></div>' +
+        '<div class="row">' +
+        '<div class="col-md-6 mb-3"><label class="form-label">Test Branch</label>' +
+        '<select class="form-select branch-select"><option>Select test project</option></select></div>' +
+        '<div class="col-md-3 mb-3"><label class="form-label">Memory (MB)</label>' +
+        '<input class="form-control form-memoryLimitMb" type="number" placeholder="1024" value="' + memVal + '"></div>' +
+        '<div class="col-md-3 mb-3"><label class="form-label">Threads</label>' +
+        '<input class="form-control form-threads" type="number" placeholder="4" value="' + threadVal + '"></div>' +
+        '</div>' +
+        '<div class="row">' +
+        '<div class="col-md-4 mb-3"><label class="form-label">Wall (s)</label>' +
+        '<input class="form-control form-wallTimeSec" type="number" placeholder="60" value="' + wallVal + '"></div>' +
+        '<div class="col-md-4 mb-3"><label class="form-label">CPU (s)</label>' +
+        '<input class="form-control form-cpuTimeSec" type="number" placeholder="30" value="' + cpuVal + '"></div>' +
+        '<div class="col-md-4 mb-3"><label class="form-label">Max Processes</label>' +
+        '<input class="form-control form-maxProcesses" type="number" placeholder="threads x multiplier" value="' + procVal + '"></div>' +
+        '</div>' +
+        '<div class="mb-3 form-check">' +
+        '<input class="form-check-input form-active" type="checkbox"' + (a.active !== false ? ' checked' : '') + '>' +
+        '<label class="form-check-label">Active</label></div>' +
+        // Verdict-script section: instructor attaches an optional .kts or
+        // .py script that overrides the default test-count verdict. UI
+        // collapses when "None" is picked so the form stays compact for
+        // assignments that don't need custom logic.
+        '<div class="card mb-3 script-section">' +
+        '<div class="card-header py-2 d-flex align-items-center flex-wrap gap-2">' +
+        '<i class="bi bi-code-slash me-1"></i>' +
+        '<span class="me-2">Verdict Script</span>' +
+        '<select class="form-select form-select-sm w-auto script-type">' +
+        '<option value="NONE">None (use default test-count verdict)</option>' +
+        '<option value="KTS">Kotlin (.kts)</option>' +
+        '<option value="PYTHON">Python (.py)</option>' +
+        '</select>' +
+        '<div class="form-check form-switch ms-2 script-enabled-wrap" style="display:none;">' +
+        '<input class="form-check-input script-enabled" type="checkbox" checked>' +
+        '<label class="form-check-label small">Enabled</label>' +
+        '</div>' +
+        '<div class="ms-2 script-timeout-wrap d-flex align-items-center" style="display:none;">' +
+        '<label class="form-label small text-muted mb-0 me-1">Timeout (ms)</label>' +
+        '<input class="form-control form-control-sm script-timeout" type="number" min="100" step="100" value="5000" style="width:7em;">' +
+        '</div>' +
+        '</div>' +
+        '<div class="card-body script-body" style="display:none;">' +
+        '<div class="row g-3">' +
+        '<div class="col-md-8">' +
+        '<label class="form-label small text-muted">Script source - runs against TaskResult after each submission</label>' +
+        '<div class="script-editor border" style="height:340px;"></div>' +
+        '</div>' +
+        '<div class="col-md-4">' +
+        '<label class="form-label small text-muted">JudgeContext schema (read-only reference)</label>' +
+        '<pre class="bg-body-tertiary border rounded p-2 small mb-0" style="height:340px;overflow:auto;">' + judgeContextDocs() + '</pre>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '<button class="btn btn-primary save-btn">Save</button>' +
         '</div>';
 
     // Title via textContent (no further escape needed)
     card.querySelector(".form-title").textContent = title;
 
     // Close + Save listeners - wire AFTER the innerHTML is settled.
-    card.querySelector(".close-form-btn").addEventListener("click", function () { hideForm(); });
+    card.querySelector(".close-form-btn").addEventListener("click", function () {
+        hideForm();
+    });
 
     var body = card.querySelector(".card-body");
 
@@ -387,7 +437,11 @@ function buildAssignmentForm(title, a) {
 
     card._typeaheadDetachers = [solutionSearch.detach, testSearch.detach];
 
-    body.querySelector(".save-btn").addEventListener("click", function () { saveAssignment(card); });
+    body.querySelector(".save-btn").addEventListener("click", function () {
+        saveAssignment(card);
+    });
+
+    initScriptEditor(card, a && a.evaluatorScript);
 
     // Pre-fill test project text + branches for existing assignment
     if (a.testRepoUrl) {
@@ -411,7 +465,8 @@ function buildAssignmentForm(title, a) {
 // --- Create / Edit ---------------------------------------------------
 
 function showCreateForm() {
-    hideForm(); hideDetail();
+    hideForm();
+    hideDetail();
     var form = buildAssignmentForm("New Assignment");
     var container = document.getElementById("new-assignment-form");
     container.textContent = "";
@@ -421,7 +476,8 @@ function showCreateForm() {
 }
 
 function editAssignment(id, afterElement) {
-    hideForm(); hideDetail();
+    hideForm();
+    hideDetail();
     editingAssignmentId = id;
     ViewEngine.call(SERVICE, "getAssignment", [id]).then(function (a) {
         if (editingAssignmentId !== id) return;
@@ -439,7 +495,10 @@ function editAssignment(id, afterElement) {
 
 function hideForm() {
     editingAssignmentId = null;
-    if (branchCheckInterval) { clearInterval(branchCheckInterval); branchCheckInterval = null; }
+    if (branchCheckInterval) {
+        clearInterval(branchCheckInterval);
+        branchCheckInterval = null;
+    }
     if (activeFormElement) {
         // Detach typeahead document-level mousedown handlers so they don't leak
         // and keep removed DOM nodes alive in memory.
@@ -467,7 +526,12 @@ function hideForm() {
 function runDetachers(el) {
     var detachers = el._typeaheadDetachers;
     if (!detachers) return;
-    detachers.forEach(function (fn) { try { fn(); } catch (_) {} });
+    detachers.forEach(function (fn) {
+        try {
+            fn();
+        } catch (_) {
+        }
+    });
     el._typeaheadDetachers = null;
 }
 
@@ -479,6 +543,7 @@ function saveAssignment(formEl) {
     var wallVal = body.querySelector(".form-wallTimeSec").value;
     var cpuVal = body.querySelector(".form-cpuTimeSec").value;
     var procVal = body.querySelector(".form-maxProcesses").value;
+    var scriptPayload = collectScriptPayload(formEl);
     var data = {
         id: idVal ? parseInt(idVal) : null,
         code: body.querySelector(".form-code").value,
@@ -492,9 +557,14 @@ function saveAssignment(formEl) {
         wallTimeSec: wallVal ? parseInt(wallVal) : null,
         cpuTimeSec: cpuVal ? parseInt(cpuVal) : null,
         maxProcesses: procVal ? parseInt(procVal) : null,
-        active: body.querySelector(".form-active").checked
+        active: body.querySelector(".form-active").checked,
+        evaluatorScript: scriptPayload.evaluatorScript,
+        clearEvaluatorScript: scriptPayload.clearEvaluatorScript
     };
-    if (!data.gitlabProjectPath) { Prl.alert("#main-alert", "warning", "Select a solution project."); return; }
+    if (!data.gitlabProjectPath) {
+        Prl.alert("#main-alert", "warning", "Select a solution project.");
+        return;
+    }
     ViewEngine.call(SERVICE, "saveAssignment", [data]).then(function () {
         hideForm();
         Prl.alert("#main-alert", "success", "Assignment saved.");
@@ -507,7 +577,8 @@ function saveAssignment(formEl) {
 function deleteAssignment(id) {
     if (!confirm("Delete this assignment?")) return;
     ViewEngine.call(SERVICE, "deleteAssignment", [id]).then(function () {
-        hideForm(); hideDetail();
+        hideForm();
+        hideDetail();
         Prl.alert("#main-alert", "success", "Assignment deleted.");
         loadAssignments();
     }).catch(function (err) {
@@ -520,8 +591,12 @@ function deleteAssignment(id) {
 var currentAssignmentId = null;
 
 function toggleDetail(id, afterElement) {
-    if (currentAssignmentId === id) { hideDetail(); return; }
-    hideDetail(); hideForm();
+    if (currentAssignmentId === id) {
+        hideDetail();
+        return;
+    }
+    hideDetail();
+    hideForm();
     currentAssignmentId = id;
 
     var card = document.createElement("div");
@@ -529,14 +604,18 @@ function toggleDetail(id, afterElement) {
     card.innerHTML = '<div class="card-header d-flex justify-content-between">' +
         '<span>Forks</span><button class="btn-close detail-close-btn"></button></div>' +
         '<div class="card-body">' +
-            '<h6>Create Forks</h6><div class="fork-groups-container mb-2"></div>' +
-            '<button class="btn btn-primary btn-sm create-forks-btn"><i class="bi bi-git"></i> Create Selected Forks</button>' +
-            '<div class="fork-results mt-3"></div><hr>' +
-            '<h6>Existing Forks</h6><div class="existing-forks">Loading...</div>' +
+        '<h6>Create Forks</h6><div class="fork-groups-container mb-2"></div>' +
+        '<button class="btn btn-primary btn-sm create-forks-btn"><i class="bi bi-git"></i> Create Selected Forks</button>' +
+        '<div class="fork-results mt-3"></div><hr>' +
+        '<h6>Existing Forks</h6><div class="existing-forks">Loading...</div>' +
         '</div>';
 
-    card.querySelector(".detail-close-btn").addEventListener("click", function () { hideDetail(); });
-    card.querySelector(".create-forks-btn").addEventListener("click", function () { createForks(card); });
+    card.querySelector(".detail-close-btn").addEventListener("click", function () {
+        hideDetail();
+    });
+    card.querySelector(".create-forks-btn").addEventListener("click", function () {
+        createForks(card);
+    });
 
     if (afterElement && afterElement.parentNode) {
         afterElement.parentNode.insertBefore(card, afterElement.nextSibling);
@@ -548,22 +627,33 @@ function toggleDetail(id, afterElement) {
     groupsContainer.textContent = "Loading...";
     ViewEngine.call(SERVICE, "getGroupsWithForkStatus", [id]).then(function (groups) {
         renderForkGroups(groups || [], groupsContainer);
-    }).catch(function (err) { groupsContainer.textContent = "Error: " + err; });
+    }).catch(function (err) {
+        groupsContainer.textContent = "Error: " + err;
+    });
 
     loadExistingForksInto(card.querySelector(".existing-forks"), id);
 }
 
 function hideDetail() {
     currentAssignmentId = null;
-    if (activeDetailElement) { activeDetailElement.remove(); activeDetailElement = null; }
+    if (activeDetailElement) {
+        activeDetailElement.remove();
+        activeDetailElement = null;
+    }
 }
 
 function createForks(card) {
     var checked = card.querySelectorAll(".fork-member-cb:checked:not(:disabled)");
-    var usernames = Array.from(checked).map(function (cb) { return cb.value; });
-    if (usernames.length === 0) { Prl.alert("#main-alert", "warning", "Select at least one student."); return; }
+    var usernames = Array.from(checked).map(function (cb) {
+        return cb.value;
+    });
+    if (usernames.length === 0) {
+        Prl.alert("#main-alert", "warning", "Select at least one student.");
+        return;
+    }
 
     var btn = card.querySelector(".create-forks-btn");
+
     function restoreBtn() {
         if (!btn) return;
         btn.disabled = false;
@@ -571,7 +661,11 @@ function createForks(card) {
         btn.appendChild(Prl.el("i", {className: "bi bi-git"}));
         btn.appendChild(document.createTextNode(" Create Selected Forks"));
     }
-    if (btn) { btn.disabled = true; btn.textContent = "Creating..."; }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Creating...";
+    }
     var resultsDiv = card.querySelector(".fork-results");
     resultsDiv.textContent = "Creating " + usernames.length + " fork(s)...";
 
@@ -580,7 +674,8 @@ function createForks(card) {
         .then(function (result) {
             restoreBtn();
             resultsDiv.textContent = "";
-            var ul = document.createElement("ul"); ul.className = "list-unstyled mb-0";
+            var ul = document.createElement("ul");
+            ul.className = "list-unstyled mb-0";
             (result.results || []).forEach(function (r) {
                 var li = document.createElement("li");
                 if (r.success) {
@@ -601,25 +696,37 @@ function createForks(card) {
                 var searchVal = gc.querySelector("input[type='text']");
                 var sv = searchVal ? searchVal.value : "";
                 renderForkGroups(g || [], gc);
-                if (sv) { var ns = gc.querySelector("input[type='text']"); if (ns) { ns.value = sv; filterForkGroupsIn(gc, sv.toLowerCase()); } }
+                if (sv) {
+                    var ns = gc.querySelector("input[type='text']");
+                    if (ns) {
+                        ns.value = sv;
+                        filterForkGroupsIn(gc, sv.toLowerCase());
+                    }
+                }
             });
             loadExistingForksInto(card.querySelector(".existing-forks"), currentAssignmentId);
         }).catch(function (err) {
-            restoreBtn();
-            resultsDiv.textContent = "Failed: " + err;
-        });
+        restoreBtn();
+        resultsDiv.textContent = "Failed: " + err;
+    });
 }
 
 // --- Fork Groups -----------------------------------------------------
 
 function renderForkGroups(groups, container) {
     container.textContent = "";
-    if (groups.length === 0) { container.textContent = "No student groups."; return; }
+    if (groups.length === 0) {
+        container.textContent = "No student groups.";
+        return;
+    }
 
     var search = document.createElement("input");
-    search.type = "text"; search.className = "form-control form-control-sm mb-2";
+    search.type = "text";
+    search.className = "form-control form-control-sm mb-2";
     search.placeholder = "Search groups or students...";
-    search.addEventListener("input", function () { filterForkGroupsIn(container, this.value.toLowerCase()); });
+    search.addEventListener("input", function () {
+        filterForkGroupsIn(container, this.value.toLowerCase());
+    });
     container.appendChild(search);
 
     groups.forEach(function (g) {
@@ -631,56 +738,86 @@ function renderForkGroups(groups, container) {
         var header = document.createElement("div");
         header.className = "d-flex justify-content-between align-items-center";
         header.style.cursor = "pointer";
-        var left = document.createElement("div"); left.className = "d-flex align-items-center";
+        var left = document.createElement("div");
+        left.className = "d-flex align-items-center";
 
         if (hasCreatable) {
-            var gcb = document.createElement("input"); gcb.type = "checkbox";
-            gcb.className = "form-check-input me-2"; gcb.setAttribute("data-group-cb", "1");
+            var gcb = document.createElement("input");
+            gcb.type = "checkbox";
+            gcb.className = "form-check-input me-2";
+            gcb.setAttribute("data-group-cb", "1");
             left.appendChild(gcb);
         }
 
-        var label = document.createElement("strong"); label.textContent = g.name || "";
+        var label = document.createElement("strong");
+        label.textContent = g.name || "";
         left.appendChild(label);
-        left.appendChild(Prl.el("small", {className: "text-muted ms-2", text: " " + (g.memberCount || 0) + " members"}));
+        left.appendChild(Prl.el("small", {
+            className: "text-muted ms-2",
+            text: " " + (g.memberCount || 0) + " members"
+        }));
 
-        if (g.missingForkCount > 0) left.appendChild(Prl.el("small", {className: "badge bg-warning ms-2", text: " " + g.missingForkCount + " not created"}));
-        if ((g.unavailableCount || 0) > 0) left.appendChild(Prl.el("small", {className: "badge bg-danger ms-2", text: " " + g.unavailableCount + " unavailable"}));
-        if (g.missingForkCount === 0 && (g.unavailableCount || 0) === 0) left.appendChild(Prl.el("small", {className: "badge bg-success ms-2", text: " all forked"}));
+        if (g.missingForkCount > 0) left.appendChild(Prl.el("small", {
+            className: "badge bg-warning ms-2",
+            text: " " + g.missingForkCount + " not created"
+        }));
+        if ((g.unavailableCount || 0) > 0) left.appendChild(Prl.el("small", {
+            className: "badge bg-danger ms-2",
+            text: " " + g.unavailableCount + " unavailable"
+        }));
+        if (g.missingForkCount === 0 && (g.unavailableCount || 0) === 0) left.appendChild(Prl.el("small", {
+            className: "badge bg-success ms-2",
+            text: " all forked"
+        }));
 
         header.appendChild(left);
-        var chevron = document.createElement("i"); chevron.className = "bi bi-chevron-down";
+        var chevron = document.createElement("i");
+        chevron.className = "bi bi-chevron-down";
         header.appendChild(chevron);
         card.appendChild(header);
 
-        var memberList = document.createElement("div"); memberList.style.display = "none"; memberList.className = "mt-2";
+        var memberList = document.createElement("div");
+        memberList.style.display = "none";
+        memberList.className = "mt-2";
         memberList.setAttribute("data-member-list", "true");
 
         (g.members || []).forEach(function (m) {
-            var row = document.createElement("div"); row.className = "form-check ms-4 fork-member-row";
+            var row = document.createElement("div");
+            row.className = "form-check ms-4 fork-member-row";
             row.setAttribute("data-username", (m.username || "").toLowerCase());
             row.setAttribute("data-displayname", (m.displayName || "").toLowerCase());
 
-            var cb = document.createElement("input"); cb.type = "checkbox";
-            cb.className = "form-check-input fork-member-cb"; cb.value = m.username;
+            var cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.className = "form-check-input fork-member-cb";
+            cb.value = m.username;
             cb.checked = !m.hasFork && m.gitlabExists !== false;
             cb.disabled = m.hasFork || m.gitlabExists === false;
 
-            var lbl = document.createElement("label"); lbl.className = "form-check-label";
+            var lbl = document.createElement("label");
+            lbl.className = "form-check-label";
             if (m.hasFork) {
                 lbl.appendChild(Prl.el("i", {className: "bi bi-check-circle text-success"}));
                 lbl.appendChild(document.createTextNode(" " + (m.username || "")));
-                if (m.displayName) lbl.appendChild(Prl.el("small", {className: "text-muted", text: " (" + m.displayName + ")"}));
+                if (m.displayName) lbl.appendChild(Prl.el("small", {
+                    className: "text-muted",
+                    text: " (" + m.displayName + ")"
+                }));
                 lbl.appendChild(Prl.el("small", {className: "text-success", text: " forked"}));
             } else if (m.gitlabExists === false) {
                 lbl.appendChild(Prl.el("i", {className: "bi bi-exclamation-triangle text-danger"}));
                 lbl.appendChild(document.createTextNode(" " + (m.username || "")));
-                if (m.displayName) lbl.appendChild(Prl.el("small", {className: "text-muted", text: " (" + m.displayName + ")"}));
+                if (m.displayName) lbl.appendChild(Prl.el("small", {
+                    className: "text-muted",
+                    text: " (" + m.displayName + ")"
+                }));
                 lbl.appendChild(Prl.el("small", {className: "text-danger", text: " unavailable"}));
             } else {
                 lbl.textContent = (m.username || "") + (m.displayName ? " (" + m.displayName + ")" : "");
             }
 
-            row.appendChild(cb); row.appendChild(lbl);
+            row.appendChild(cb);
+            row.appendChild(lbl);
             memberList.appendChild(row);
         });
         card.appendChild(memberList);
@@ -695,7 +832,9 @@ function renderForkGroups(groups, container) {
         if (hasCreatable) {
             var gcbEl = card.querySelector("[data-group-cb]");
             if (gcbEl) gcbEl.addEventListener("change", function () {
-                memberList.querySelectorAll(".fork-member-cb:not(:disabled)").forEach(function (c) { c.checked = gcbEl.checked; });
+                memberList.querySelectorAll(".fork-member-cb:not(:disabled)").forEach(function (c) {
+                    c.checked = gcbEl.checked;
+                });
             });
         }
 
@@ -705,7 +844,13 @@ function renderForkGroups(groups, container) {
 
 function filterForkGroupsIn(container, query) {
     container.querySelectorAll(".fork-group-card").forEach(function (card) {
-        if (!query) { card.style.display = ""; card.querySelectorAll(".fork-member-row").forEach(function (r) { r.style.display = ""; }); return; }
+        if (!query) {
+            card.style.display = "";
+            card.querySelectorAll(".fork-member-row").forEach(function (r) {
+                r.style.display = "";
+            });
+            return;
+        }
         var groupMatch = (card.getAttribute("data-group-name") || "").indexOf(query) !== -1;
         var anyMember = false;
         card.querySelectorAll(".fork-member-row").forEach(function (row) {
@@ -714,7 +859,10 @@ function filterForkGroupsIn(container, query) {
             if (match) anyMember = true;
         });
         card.style.display = (groupMatch || anyMember) ? "" : "none";
-        if (anyMember && !groupMatch) { var ml = card.querySelector("[data-member-list]"); if (ml) ml.style.display = ""; }
+        if (anyMember && !groupMatch) {
+            var ml = card.querySelector("[data-member-list]");
+            if (ml) ml.style.display = "";
+        }
     });
 }
 
@@ -722,15 +870,223 @@ function loadExistingForksInto(container, assignmentId) {
     container.textContent = "Loading...";
     ViewEngine.call(SERVICE, "getExistingForks", [assignmentId]).then(function (forks) {
         container.textContent = "";
-        if (!forks || forks.length === 0) { container.textContent = "No forks yet"; return; }
-        var ul = document.createElement("ul"); ul.className = "list-unstyled mb-0";
+        if (!forks || forks.length === 0) {
+            container.textContent = "No forks yet";
+            return;
+        }
+        var ul = document.createElement("ul");
+        ul.className = "list-unstyled mb-0";
         forks.forEach(function (f) {
             var li = document.createElement("li");
-            li.appendChild(Prl.el("i", {className: "bi bi-git"})); li.appendChild(document.createTextNode(" "));
-            var link = document.createElement("a"); link.href = f.webUrl; link.target = "_blank";
-            link.textContent = f.pathWithNamespace; li.appendChild(link);
+            li.appendChild(Prl.el("i", {className: "bi bi-git"}));
+            li.appendChild(document.createTextNode(" "));
+            var link = document.createElement("a");
+            link.href = f.webUrl;
+            link.target = "_blank";
+            link.textContent = f.pathWithNamespace;
+            li.appendChild(link);
             ul.appendChild(li);
         });
         container.appendChild(ul);
-    }).catch(function (err) { container.textContent = "Error: " + err; });
+    }).catch(function (err) {
+        container.textContent = "Error: " + err;
+    });
+}
+
+// --- Verdict Script editor (Monaco) ---------------------------------
+
+// Monaco is loaded via the AMD loader from CDN once per page; each form gets
+// its own editor instance attached to the .script-editor element.
+var monacoReady = null;
+
+function ensureMonaco() {
+    if (monacoReady) return monacoReady;
+    monacoReady = new Promise(function (resolve, reject) {
+        if (typeof require === "undefined" || !require.config) {
+            reject(new Error("Monaco loader not present"));
+            return;
+        }
+        require.config({paths: {vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs"}});
+        require(["vs/editor/editor.main"], function () {
+            resolve(window.monaco);
+        }, reject);
+    });
+    return monacoReady;
+}
+
+var SCRIPT_TEMPLATES = {
+    KTS: [
+        "import com.nelos.parallel.pipeline.kts.api.judge",
+        "import com.nelos.parallel.pipeline.kts.api.pass",
+        "import com.nelos.parallel.pipeline.kts.api.fail",
+        "import com.nelos.parallel.pipeline.kts.api.followBaseline",
+        "",
+        "// Available: ctx.result (TaskResult), ctx.baseline (default verdict)",
+        "// Helpers: pass(summary, reason), fail(reason, summary), followBaseline(reason)",
+        "// See the JudgeContext schema on the right.",
+        "",
+        "judge { ctx ->",
+        "    val perf = ctx.result.summary?.performance",
+        "    val passed = perf?.passed",
+        "    val total = perf?.totalTests",
+        "    if (passed == null || total == null || total == 0) {",
+        "        followBaseline(\"No performance data\")",
+        "    } else if (passed.toDouble() / total >= 0.7) {",
+        "        pass(summary = \"perf rate $passed/$total\")",
+        "    } else {",
+        "        fail(reason = \"Need 70% perf pass rate, got $passed/$total\")",
+        "    }",
+        "}",
+        ""
+    ].join("\n"),
+    PYTHON: [
+        "# Stdin = JudgeContext JSON (see schema on the right).",
+        "# Print a JudgeResult JSON to stdout: {pass, summary?, reason?}.",
+        "import json, sys",
+        "ctx = json.load(sys.stdin)",
+        "perf = ctx['result'].get('summary', {}).get('performance')",
+        "if perf is None:",
+        "    out = {'pass': ctx['baseline']['submissionStatus'] == 'COMPLETED',",
+        "           'reason': 'No performance data'}",
+        "elif perf['passed'] / perf['totalTests'] >= 0.7:",
+        "    out = {'pass': True, 'summary': f\"perf rate {perf['passed']}/{perf['totalTests']}\"}",
+        "else:",
+        "    out = {'pass': False, 'reason': f\"Need 70% perf pass rate, got {perf['passed']}/{perf['totalTests']}\"}",
+        "print(json.dumps(out))",
+        ""
+    ].join("\n")
+};
+
+// Read-only sidebar - instructor sees the field structure JudgeContext exposes
+// to their script. Tracks the Kotlin VO definitions in pipeline/commons; if
+// those change, update here too. Plain text on purpose (no live introspection).
+function judgeContextDocs() {
+    return [
+        "JudgeContext",
+        "+-- result: TaskResult",
+        "|   +-- status: String          // \"completed\" | \"failed\" | \"cancelled\"",
+        "|   +-- durationMs: Double?",
+        "|   +-- error: String?",
+        "|   +-- failedStep: String?",
+        "|   +-- correctness: ScenarioResult[]?",
+        "|   +-- performance: ScenarioResult[]?",
+        "|   +-- performanceSkipped: Boolean?",
+        "|   +-- assignmentConfig: { framework, mode, ... }?",
+        "|   +-- environment: { platform, hardwareThreads }?",
+        "|   +-- effectiveParams: { threads, memoryLimitMb, ... }?",
+        "|   \-- summary: ResultSummary?",
+        "|       +-- correctness: TestSummary?",
+        "|       \-- performance: TestSummary?",
+        "|           +-- totalTests: Int?",
+        "|           +-- passed: Int?",
+        "|           +-- failed: Int?",
+        "|           +-- failedByTimeout: Int?",
+        "|           +-- failedByOom: Int?",
+        "|           +-- failedByCrash: Int?",
+        "|           +-- failedByCorrectness: Int?",
+        "|           \-- scalability: ScalabilityPoint[]?",
+        "|",
+        "\-- baseline: SubmissionVerdict",
+        "    +-- submissionStatus: COMPLETED | FAILED | ERROR | REJECTED",
+        "    +-- jobStatus: SUCCESS | FAILED | INTERRUPTED | ERROR",
+        "    +-- summary: String",
+        "    \-- reason: String?",
+        "",
+        "Return / print JudgeResult:",
+        "    { pass: Boolean,",
+        "      summary: String?,   // short one-liner for UI / CI",
+        "      reason: String? }   // long explanation"
+    ].join("\n");
+}
+
+// Wires the script section: language dropdown toggles editor visibility +
+// switches Monaco language mode; existing script is loaded into the editor.
+function initScriptEditor(formCard, existingScript) {
+    var section = formCard.querySelector(".script-section");
+    if (!section) return;
+    var typeSelect = section.querySelector(".script-type");
+    var body = section.querySelector(".script-body");
+    var editorHost = section.querySelector(".script-editor");
+    var enabledWrap = section.querySelector(".script-enabled-wrap");
+    var enabledInput = section.querySelector(".script-enabled");
+    var timeoutWrap = section.querySelector(".script-timeout-wrap");
+    var timeoutInput = section.querySelector(".script-timeout");
+
+    var currentType = (existingScript && existingScript.type) ? existingScript.type : "NONE";
+    var sourceCache = {KTS: SCRIPT_TEMPLATES.KTS, PYTHON: SCRIPT_TEMPLATES.PYTHON};
+    if (existingScript && existingScript.source) {
+        sourceCache[existingScript.type] = existingScript.source;
+    }
+    typeSelect.value = currentType;
+    if (existingScript) {
+        if (existingScript.enabled === false) enabledInput.checked = false;
+        if (existingScript.timeoutMs != null) timeoutInput.value = existingScript.timeoutMs;
+    }
+
+    var editor = null;
+
+    function syncVisibility() {
+        var t = typeSelect.value;
+        if (t === "NONE") {
+            body.style.display = "none";
+            enabledWrap.style.display = "none";
+            timeoutWrap.style.display = "none";
+            return;
+        }
+        body.style.display = "";
+        enabledWrap.style.display = "";
+        timeoutWrap.style.display = "";
+        ensureMonaco().then(function (monaco) {
+            if (!editor) {
+                editor = monaco.editor.create(editorHost, {
+                    value: sourceCache[t] || SCRIPT_TEMPLATES[t] || "",
+                    language: t === "KTS" ? "kotlin" : "python",
+                    theme: "vs-dark",
+                    automaticLayout: true,
+                    minimap: {enabled: false},
+                    fontSize: 13,
+                    scrollBeyondLastLine: false,
+                });
+                formCard._scriptEditor = editor;
+            } else {
+                // Cache current text under the OLD type before switching, so a
+                // user toggling KTS <-> PYTHON doesn't lose their work.
+                if (editor._lastType) sourceCache[editor._lastType] = editor.getValue();
+                monaco.editor.setModelLanguage(editor.getModel(), t === "KTS" ? "kotlin" : "python");
+                editor.setValue(sourceCache[t] || SCRIPT_TEMPLATES[t] || "");
+            }
+            editor._lastType = t;
+        }).catch(function (err) {
+            editorHost.textContent = "Monaco failed to load: " + (err && err.message ? err.message : err);
+        });
+    }
+
+    typeSelect.addEventListener("change", syncVisibility);
+    syncVisibility();
+}
+
+// Pulls the script payload out of the form for save. Returns either:
+//   { evaluatorScript: { type, source } } - instructor wants this script attached
+//   { clearEvaluatorScript: true }        - instructor switched dropdown to NONE
+//   {}                                    - script section never rendered (legacy form)
+function collectScriptPayload(formCard) {
+    var section = formCard.querySelector(".script-section");
+    if (!section) return {};
+    var type = section.querySelector(".script-type").value;
+    if (type === "NONE") return {clearEvaluatorScript: true};
+    var editor = formCard._scriptEditor;
+    var source = editor ? editor.getValue() : (SCRIPT_TEMPLATES[type] || "");
+    if (!source.trim()) return {clearEvaluatorScript: true};
+    var enabledEl = section.querySelector(".script-enabled");
+    var timeoutEl = section.querySelector(".script-timeout");
+    var timeoutMs = parseInt(timeoutEl && timeoutEl.value, 10);
+    if (!timeoutMs || timeoutMs <= 0) timeoutMs = 5000;
+    return {
+        evaluatorScript: {
+            type: type,
+            source: source,
+            enabled: !enabledEl || enabledEl.checked,
+            timeoutMs: timeoutMs
+        }
+    };
 }

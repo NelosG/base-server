@@ -53,7 +53,27 @@
         </dependency>
         <dependency>
             <groupId>nelos.parallel</groupId>
-            <artifactId>parallel-server-gitlab-pipeline</artifactId>
+            <artifactId>parallel-server-pipeline-core</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-pipeline-forms</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-pipeline-kts</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-pipeline-python</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-gitlab-integration</artifactId>
             <version>${parallel-server.version}</version>
         </dependency>
         <dependency>

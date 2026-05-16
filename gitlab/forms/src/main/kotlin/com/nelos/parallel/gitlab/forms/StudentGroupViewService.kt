@@ -5,15 +5,15 @@ import com.nelos.parallel.auth.service.UserService
 import com.nelos.parallel.commons.security.AppRole
 import com.nelos.parallel.commons.view.service.ViewService
 import com.nelos.parallel.gitlab.entity.GitlabUser
-import com.nelos.parallel.gitlab.entity.StudentGroup
-import com.nelos.parallel.gitlab.entity.StudentGroupMember
 import com.nelos.parallel.gitlab.forms.vo.SaveStudentGroupRequest
 import com.nelos.parallel.gitlab.forms.vo.StudentGroupMemberView
 import com.nelos.parallel.gitlab.forms.vo.StudentGroupView
-import com.nelos.parallel.gitlab.service.GitlabStudentResolver
+import com.nelos.parallel.gitlab.integration.GitlabStudentResolver
 import com.nelos.parallel.gitlab.service.GitlabUserService
-import com.nelos.parallel.gitlab.service.StudentGroupMemberService
-import com.nelos.parallel.gitlab.service.StudentGroupService
+import com.nelos.parallel.pipeline.data.entity.StudentGroup
+import com.nelos.parallel.pipeline.data.entity.StudentGroupMember
+import com.nelos.parallel.pipeline.data.service.StudentGroupMemberService
+import com.nelos.parallel.pipeline.data.service.StudentGroupService
 import org.springframework.transaction.annotation.Transactional
 
 /**
@@ -85,7 +85,7 @@ class StudentGroupViewService(
         val gitlabName = view.gitlabName?.takeIf { it.isNotBlank() }
             ?: view.login?.takeIf { it.isNotBlank() }
             ?: return null
-        return studentResolver.resolveOrAutoCreate(gitlabName)
+        return userService.tryFindById(studentResolver.resolveOrAutoCreate(gitlabName))
     }
 
     private fun loadContext() = ViewContext(

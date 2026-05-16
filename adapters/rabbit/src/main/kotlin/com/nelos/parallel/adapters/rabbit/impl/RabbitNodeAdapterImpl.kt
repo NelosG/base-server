@@ -3,11 +3,12 @@ package com.nelos.parallel.adapters.rabbit.impl
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.nelos.parallel.adapters.rabbit.RabbitConstants
-import com.nelos.parallel.adapters.rabbit.RabbitNodeAdapter
 import com.nelos.parallel.adapters.rabbit.exceptions.RabbitAdapterException
+import com.nelos.parallel.commons.adapter.NodeAdapter
 import com.nelos.parallel.commons.adapter.enums.TransportType
 import com.nelos.parallel.commons.adapter.vo.NodeInfo
-import com.nelos.parallel.commons.adapter.vo.request.*
+import com.nelos.parallel.commons.adapter.vo.request.ConfigUpdateRequest
+import com.nelos.parallel.commons.adapter.vo.request.TaskSubmission
 import com.nelos.parallel.commons.adapter.vo.response.*
 import com.rabbitmq.client.AMQP
 import com.rabbitmq.client.DefaultConsumer
@@ -17,9 +18,11 @@ import org.springframework.amqp.core.Message
 import org.springframework.amqp.core.MessageProperties
 import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
+import java.time.Duration
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -40,7 +43,15 @@ class RabbitNodeAdapterImpl(
     @Qualifier("prl.controlRabbitTemplate")
     private val controlRabbitTemplate: RabbitTemplate,
     private val objectMapper: ObjectMapper,
-) : RabbitNodeAdapter {
+    // Same Duration as StuckSubmissionCleanupJob: a task message that the
+    // runner hasn't consumed within this window is considered abandoned
+    // (the orchestrator has already marked the matching Submission TIMEOUT,
+    // and GitLab CI has long given up). Per-message TTL lets the broker drop
+    // such messages automatically so a runner reconnecting after a long
+    // outage doesn't burn cycles on stale tasks.
+    @Value("\${parallel.submission.stuck-timeout:PT10M}")
+    private val stuckTimeout: Duration,
+) : NodeAdapter {
 
     override val transportType: TransportType = TransportType.AMQP
 
@@ -49,6 +60,7 @@ class RabbitNodeAdapterImpl(
             val routingKey = RabbitConstants.ROUTING_KEY_CORRECTNESS
             val message = jsonMessage(task) {
                 setHeader("nodeId", node.nodeId)
+                expiration = stuckTimeout.toMillis().toString()
             }
 
             val response = rabbitTemplate.sendAndReceive(

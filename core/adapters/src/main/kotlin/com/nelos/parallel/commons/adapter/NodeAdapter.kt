@@ -3,7 +3,8 @@ package com.nelos.parallel.commons.adapter
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.nelos.parallel.commons.adapter.enums.TransportType
 import com.nelos.parallel.commons.adapter.vo.NodeInfo
-import com.nelos.parallel.commons.adapter.vo.request.*
+import com.nelos.parallel.commons.adapter.vo.request.ConfigUpdateRequest
+import com.nelos.parallel.commons.adapter.vo.request.TaskSubmission
 import com.nelos.parallel.commons.adapter.vo.response.*
 
 /**
@@ -93,4 +94,25 @@ interface NodeAdapter {
      * Unloads a resource provider from the specified node.
      */
     fun unloadResourceProvider(node: NodeInfo, name: String): ResourceProviderActionResult
+
+    /**
+     * Discovers live nodes reachable over this adapter's transport by broadcasting
+     * a probe and aggregating replies. Returns an empty list if the transport
+     * doesn't support active discovery (e.g. HTTP, where engines push themselves
+     * via `/api/register`).
+     */
+    fun discoverNodes(timeoutMs: Long = 2000): List<NodeInfo> = emptyList()
+
+    /**
+     * Pick a node from [candidates] suitable for dispatch over this transport.
+     *
+     * The default implementation just returns the first candidate - appropriate
+     * for broker-routed transports (e.g. AMQP) where any consumer that owns the
+     * transport can take the task and the broker handles routing. Point-to-point
+     * transports (e.g. HTTP) override to probe each candidate; failed probes go
+     * in [RunnerPick.deadNodes] so the caller can strip those transports from
+     * the registry to skip them next time.
+     */
+    fun pickRunnerNode(candidates: List<NodeInfo>): RunnerPick =
+        RunnerPick(live = candidates.firstOrNull())
 }

@@ -7,13 +7,13 @@ import com.nelos.parallel.auth.service.UserService
 import com.nelos.parallel.commons.security.AppRole
 import com.nelos.parallel.commons.view.service.ViewService
 import com.nelos.parallel.gitlab.entity.GitlabUser
-import com.nelos.parallel.gitlab.entity.StudentGroupMember
 import com.nelos.parallel.gitlab.forms.vo.CreateStudentRequest
 import com.nelos.parallel.gitlab.forms.vo.StudentView
 import com.nelos.parallel.gitlab.service.GitlabUserService
-import com.nelos.parallel.gitlab.service.StudentGroupMemberService
-import com.nelos.parallel.gitlab.service.StudentGroupService
-import com.nelos.parallel.gitlab.service.SubmissionService
+import com.nelos.parallel.pipeline.data.entity.StudentGroupMember
+import com.nelos.parallel.pipeline.data.service.StudentGroupMemberService
+import com.nelos.parallel.pipeline.data.service.StudentGroupService
+import com.nelos.parallel.pipeline.data.service.SubmissionService
 import org.slf4j.LoggerFactory
 import org.springframework.transaction.annotation.Transactional
 
@@ -48,6 +48,7 @@ class StudentViewService(
                 val membered = members.mapNotNull { it.userId }.toSet()
                 students.filter { it.id !in membered }
             }
+
             else -> {
                 val ids = members.filter { it.groupId == groupId }.mapNotNull { it.userId }.toSet()
                 students.filter { it.id in ids }
@@ -106,8 +107,13 @@ class StudentViewService(
         val user = userService.tryFindById(id) ?: error("Student $id not found")
         if (user.type != UserType.STUDENT) error("User $id is not a student")
         if (displayName != null) {
-            user.displayName = displayName.trim().takeIf { it.isNotBlank() } ?: user.displayName
-            userService.save(user)
+            // Skip the write entirely when the incoming value is blank or already matches -
+            // avoids issuing a no-op UPDATE for an otherwise untouched row.
+            val trimmed = displayName.trim().takeIf { it.isNotBlank() }
+            if (trimmed != null && trimmed != user.displayName) {
+                user.displayName = trimmed
+                userService.save(user)
+            }
         }
         if (gitlabName != null) {
             val trimmed = gitlabName.trim()
@@ -151,7 +157,7 @@ class StudentViewService(
     private fun User.toView(
         gitlabByUserId: Map<Long?, GitlabUser>,
         allMembers: List<StudentGroupMember>,
-        groupsById: Map<Long?, com.nelos.parallel.gitlab.entity.StudentGroup>,
+        groupsById: Map<Long?, com.nelos.parallel.pipeline.data.entity.StudentGroup>,
         submissionCounts: Map<Long?, Int>,
     ): StudentView {
         val myMembers = allMembers.filter { it.userId == id }
@@ -174,6 +180,7 @@ class StudentViewService(
 
     companion object {
         private val LOG = LoggerFactory.getLogger(StudentViewService::class.java)
+
         /** Synthetic group id meaning "students without any group membership". */
         const val STUDENTS_WITHOUT_GROUP: Long = -1L
     }

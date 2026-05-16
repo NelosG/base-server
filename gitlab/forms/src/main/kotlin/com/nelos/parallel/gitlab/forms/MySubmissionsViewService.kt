@@ -6,8 +6,8 @@ import com.nelos.parallel.commons.security.AppRole
 import com.nelos.parallel.commons.view.service.ViewService
 import com.nelos.parallel.gitlab.forms.vo.SubmissionDetailView
 import com.nelos.parallel.gitlab.forms.vo.SubmissionListItemView
-import com.nelos.parallel.gitlab.service.AssignmentService
-import com.nelos.parallel.gitlab.service.SubmissionService
+import com.nelos.parallel.pipeline.data.service.AssignmentService
+import com.nelos.parallel.pipeline.data.service.SubmissionService
 import org.springframework.security.core.context.SecurityContextHolder
 
 /**

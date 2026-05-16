@@ -8,6 +8,8 @@ import com.nelos.parallel.commons.security.AppRole
 import com.nelos.parallel.commons.view.service.ViewService
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * View service exposing the current user's profile (login, display name, roles, OTP flag)
@@ -56,10 +58,13 @@ class UserViewService(
         userDetailsService.changePassword(login, newPassword)
     }
 
+    @Transactional(propagation = Propagation.REQUIRED)
     fun changeDisplayName(displayName: String) {
         require(displayName.isNotBlank()) { "displayName must not be blank" }
         val auth = SecurityContextHolder.getContext().authentication
-        val user = userService.findByLogin(auth.name)
+        // FOR UPDATE so a concurrent password change / reset on the same user
+        // doesn't race against our displayName write.
+        val user = userService.findByLoginForUpdate(auth.name)
             ?: error("Current user not found")
         user.displayName = displayName
         userService.save(user)
@@ -67,6 +72,7 @@ class UserViewService(
 
     companion object {
         private const val MIN_PASSWORD_LENGTH = 8
+
         // BCrypt silently truncates inputs longer than 72 bytes. Cap at 64 bytes worth of
         // characters so multi-byte Unicode still fits - beyond this BCrypt sees only a prefix
         // and the rest of the password contributes nothing to the hash.

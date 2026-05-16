@@ -4,7 +4,7 @@ import com.nelos.parallel.commons.adapter.enums.AdapterStatus
 import com.nelos.parallel.commons.adapter.enums.TransportType
 import com.nelos.parallel.commons.adapter.vo.NodeInfo
 import org.slf4j.LoggerFactory
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Service
 
 /**
  * Manages transport-aware node deregistration and health check failures.
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component
  * @author gpushkarev
  * @since %CURRENT_VERSION%
  */
-@Component("prl.nodeTransportManager")
+@Service("prl.nodeTransportManager")
 class NodeTransportManager(
     private val nodeRegistry: NodeRegistry,
     private val adapterRegistry: NodeAdapterRegistry,
@@ -106,6 +106,33 @@ class NodeTransportManager(
     private fun registeredSince(nodeId: String, sinceTimestamp: java.time.Instant): Boolean {
         val current = nodeRegistry.findById(nodeId) ?: return false
         return current.registeredAt.isAfter(sinceTimestamp)
+    }
+
+    /**
+     * Triggers an on-demand discovery on the given transport (currently meaningful
+     * only for AMQP - HTTP returns `emptyList()`). Each responding node is merged
+     * into the registry; previously-registered nodes of the same transport type
+     * that didn't reply within the discovery timeout have THAT transport stripped
+     * (other transports on the same node, if any, are kept). Pipeline submit calls
+     * this when no live node is found in the local snapshot.
+     *
+     * @return the freshly discovered nodes (those that replied)
+     */
+    fun discoverAndRefresh(transport: TransportType): List<NodeInfo> {
+        val adapter = adapterRegistry.findAdapter(transport) ?: return emptyList()
+        val discovered = adapter.discoverNodes()
+        val responding = discovered.map { it.nodeId }.toSet()
+        LOG.info("{} discovery: {} node(s) replied", transport, discovered.size)
+
+        nodeRegistry.findByTransport(transport)
+            .filter { it.nodeId !in responding }
+            .forEach { stale ->
+                handleHealthCheckFailure(stale.nodeId, transport)
+                LOG.info("{} node did not respond to discovery: {}", transport, stale.nodeId)
+            }
+
+        discovered.forEach { nodeRegistry.register(it) }
+        return discovered
     }
 
     /**

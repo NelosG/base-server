@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>nelos.parallel</groupId>
+        <artifactId>parallel-server-pipeline</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <name>Parallel Server Pipeline Python</name>
+    <artifactId>parallel-server-pipeline-python</artifactId>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-pipeline-commons</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+
+        <!-- Jackson is already a transitive dependency in the wider app, but
+             we list it here explicitly so this module can be wired into a
+             dependency graph that doesn't drag the rest of Spring along. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- @Service / Spring stereotype annotations. -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+    </dependencies>
+</project>

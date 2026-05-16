@@ -6,7 +6,12 @@ stages:
 
 test-solution:
   stage: test
-  image: alpine:latest
+  # dwdraju/alpine-curl-jq: alpine base with curl + jq + ca-certificates
+  # already installed. Avoids the recurring `apt-get update` flakiness from
+  # the runner host's uplink to deb.debian.org (SYNs to port 80 were being
+  # dropped intermittently - "Unable to connect to deb.debian.org:80:"),
+  # and shaves ~30s per job since no packages need installing.
+  image: dwdraju/alpine-curl-jq:latest
   timeout: 10m
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -19,7 +24,8 @@ test-solution:
       - test-result.json
     expire_in: 7 days
   script:
-    - apk add --no-cache curl jq
+    # No package installation needed - curl, jq, and ca-certificates are
+    # already baked into the dwdraju/alpine-curl-jq image.
     - |
       # Determine project paths (use fallbacks for older GitLab versions)
       TARGET_PATH="${CI_MERGE_REQUEST_PROJECT_PATH:-${CI_PROJECT_PATH}}"
@@ -108,13 +114,19 @@ test-solution:
           # Save full response (with structured result) as artifact
           echo "$POLL" | jq '.' > test-result.json
 
+          # `success` and `resultSummary` are computed server-side and already
+          # account for individual test failures (engine "completed" with a
+          # non-zero failed-test count is reported as success=false). CI just
+          # surfaces the verdict; it does NOT re-derive it.
           SUCCESS=$(echo "$POLL" | jq -r '.success')
+          SUMMARY=$(echo "$POLL" | jq -r '.resultSummary // ""')
           echo ""
+          [ -n "$SUMMARY" ] && echo "Summary: ${SUMMARY}"
           if [ "$SUCCESS" = "true" ]; then
             echo "=== PASSED ==="
             exit 0
           else
-            echo "=== FAILED ==="
+            echo "=== FAILED - submission status: ${CURRENT_STATUS} ==="
             exit 1
           fi
         fi

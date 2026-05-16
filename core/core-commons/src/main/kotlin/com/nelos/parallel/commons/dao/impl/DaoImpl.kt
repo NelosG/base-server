@@ -4,6 +4,7 @@ import com.nelos.parallel.commons.dao.Dao
 import com.nelos.parallel.commons.entity.Entity
 import com.nelos.parallel.commons.util.TerFunction
 import jakarta.persistence.EntityManager
+import jakarta.persistence.LockModeType
 import jakarta.persistence.PersistenceContext
 import jakarta.persistence.criteria.*
 import org.springframework.transaction.annotation.Propagation
@@ -57,6 +58,19 @@ abstract class DaoImpl<T : Entity> : Dao<T> {
 
         return entityManager.createQuery(cq)
             .apply { maxResults = min(limit, QUERY_LIMIT) }
+            .resultList
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED)
+    override fun findByConditionForUpdate(
+        conditions: TerFunction<CriteriaBuilder, CriteriaQuery<T>, Root<T>, Predicate>
+    ): List<T> {
+        val cb = entityManager.criteriaBuilder
+        val cq = cb.createQuery(entityClass)
+        val root = cq.from(entityClass)
+        cq.where(conditions.apply(cb, cq, root))
+        return entityManager.createQuery(cq)
+            .setLockMode(LockModeType.PESSIMISTIC_WRITE)
             .resultList
     }
 

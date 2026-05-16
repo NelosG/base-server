@@ -1,43 +1,51 @@
 <!DOCTYPE html>
 <html data-bs-theme="dark" lang="en">
-<head>
-    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
-    <meta content="width=device-width, initial-scale=1.0" name="viewport">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <title>Assignments</title>
-    <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
-    <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
-    <link href="/css/main.css" rel="stylesheet"/>
-    <script src="/js/view-engine.js"></script>
-    <script src="/js/prl-utils.js"></script>
-    <script src="/js/navbar.js"></script>
-    <script src="/js/assignments.js"></script>
-</head>
-<body>
+    <head>
+        <meta content="text/html; charset=UTF-8" http-equiv="Content-Type">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+        <title>Assignments</title>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
+        <script src="/js/prl-utils.js"></script>
+        <script src="/js/navbar.js"></script>
+        <!--
+            Monaco editor - loaded lazily by assignments.js when an instructor opens
+            the "Verdict Script" section. Pinned major version so the layout doesn't
+            shift under us if the CDN updates.
+        -->
+        <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+        <script src="/js/assignments.js"></script>
+    </head>
+    <body>
 
-<div class="container mt-4">
-    <div id="main-alert" class="alert d-none"></div>
+        <div class="container mt-4">
+            <div class="alert d-none" id="main-alert"></div>
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2><i class="bi bi-card-checklist"></i> Assignments</h2>
-        <button class="btn btn-primary btn-sm" onclick="showCreateForm()">
-            <i class="bi bi-plus-lg"></i> New Assignment
-        </button>
-    </div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2><i class="bi bi-card-checklist"></i> Assignments</h2>
+                <button class="btn btn-primary btn-sm" onclick="showCreateForm()">
+                    <i class="bi bi-plus-lg"></i> New Assignment
+                </button>
+            </div>
 
-    <!-- Search -->
-    <input type="text" class="form-control form-control-sm mb-3" id="assignment-search" placeholder="Search assignments..." oninput="filterAssignments(this.value)">
+            <!-- Search -->
+            <input class="form-control form-control-sm mb-3" id="assignment-search"
+                   oninput="filterAssignments(this.value)"
+                   placeholder="Search assignments..." type="text">
 
-    <div id="loading" class="text-center mt-3">
-        <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
-    </div>
+            <div class="text-center mt-3" id="loading">
+                <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+            </div>
 
-    <!-- New Assignment form (shown at top) -->
-    <div id="new-assignment-form" style="display:none;"></div>
+            <!-- New Assignment form (shown at top) -->
+            <div id="new-assignment-form" style="display:none;"></div>
 
-    <!-- Assignment List -->
-    <div id="assignment-list" style="display:none;"></div>
-</div>
+            <!-- Assignment List -->
+            <div id="assignment-list" style="display:none;"></div>
+        </div>
 
-</body>
+    </body>
 </html>

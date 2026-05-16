@@ -23,6 +23,12 @@ class NodeDaoImpl : GenericDaoImpl<Node>(), NodeDao {
     }
 
     @Transactional(propagation = Propagation.REQUIRED)
+    override fun findByNodeIdForUpdate(nodeId: String): Node? =
+        findByConditionForUpdate { cb, _, root ->
+            cb.equal(root.get<String>("nodeId"), nodeId)
+        }.firstOrNull()
+
+    @Transactional(propagation = Propagation.REQUIRED)
     override fun deleteByIds(ids: Collection<Long>): Int {
         if (ids.isEmpty()) return 0
         val cb = entityManager.criteriaBuilder

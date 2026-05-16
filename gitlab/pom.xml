@@ -16,7 +16,7 @@
     <modules>
         <module>data</module>
         <module>client</module>
-        <module>pipeline</module>
+        <module>integration</module>
         <module>forms</module>
     </modules>
 </project>

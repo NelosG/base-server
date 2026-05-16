@@ -25,6 +25,13 @@ interface GenericService<T : AbstractEntity> : Service<T> {
     fun tryFindById(id: Long): T?
 
     /**
+     * Same as [tryFindById] but acquires a `SELECT ... FOR UPDATE` row lock.
+     * Use in read-modify-write paths to serialize concurrent updates on the
+     * same entity. Must run inside a writable transaction.
+     */
+    fun tryFindByIdForUpdate(id: Long): T?
+
+    /**
      * Removes entities by their [ids].
      */
     fun remove(ids: List<Long>)

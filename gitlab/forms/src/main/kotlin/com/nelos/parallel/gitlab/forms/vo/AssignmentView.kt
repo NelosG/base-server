@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.nelos.parallel.pipeline.commons.service.EvaluatorScript
 
 /**
  * @author gpushkarev
@@ -25,4 +26,5 @@ class AssignmentView @JsonCreator constructor(
     @param:JsonProperty("cpuTimeSec") val cpuTimeSec: Int? = null,
     @param:JsonProperty("maxProcesses") val maxProcesses: Int? = null,
     @param:JsonProperty("active") val active: Boolean? = null,
+    @param:JsonProperty("evaluatorScript") val evaluatorScript: EvaluatorScript? = null,
 )

@@ -4,6 +4,7 @@ import com.nelos.parallel.commons.dao.GenericDao
 import com.nelos.parallel.commons.dao.exceptions.DaoException
 import com.nelos.parallel.commons.entity.AbstractEntity
 import com.nelos.parallel.commons.util.TerFunction
+import jakarta.persistence.LockModeType
 import jakarta.persistence.criteria.CriteriaBuilder
 import jakarta.persistence.criteria.CriteriaQuery
 import jakarta.persistence.criteria.Order
@@ -34,6 +35,11 @@ abstract class GenericDaoImpl<T : AbstractEntity> : DaoImpl<T>(), GenericDao<T> 
     @Transactional(propagation = Propagation.SUPPORTS, readOnly = true)
     override fun tryFindById(id: Long): T? {
         return entityManager.find(entityClass, id)
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED)
+    override fun tryFindByIdForUpdate(id: Long): T? {
+        return entityManager.find(entityClass, id, LockModeType.PESSIMISTIC_WRITE)
     }
 
     @Transactional(propagation = Propagation.REQUIRED)

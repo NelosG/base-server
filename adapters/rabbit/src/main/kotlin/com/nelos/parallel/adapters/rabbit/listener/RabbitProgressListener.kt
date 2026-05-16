@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.nelos.parallel.adapters.rabbit.RabbitConstants
 import com.nelos.parallel.commons.adapter.vo.request.ProgressEvent
-import com.nelos.parallel.gitlab.pipeline.service.PipelineService
+import com.nelos.parallel.pipeline.commons.service.PipelineService
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.rabbit.annotation.RabbitListener
 import org.springframework.stereotype.Component

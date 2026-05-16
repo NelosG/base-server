@@ -1,7 +1,7 @@
 package com.nelos.parallel.adapters.http.controllers
 
 import com.nelos.parallel.commons.adapter.vo.request.ProgressEvent
-import com.nelos.parallel.gitlab.pipeline.service.PipelineService
+import com.nelos.parallel.pipeline.commons.service.PipelineService
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping

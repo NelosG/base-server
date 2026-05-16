@@ -21,6 +21,11 @@ class NodeServiceImpl : GenericServiceImpl<Node, NodeDao>(), NodeService {
     }
 
     @Transactional(propagation = Propagation.REQUIRED)
+    override fun findByNodeIdForUpdate(nodeId: String): Node? {
+        return invokeDaoMethod { it.findByNodeIdForUpdate(nodeId) }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED)
     override fun deleteByIds(ids: Collection<Long>): Int {
         return invokeDaoMethod { it.deleteByIds(ids) }
     }

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>nelos.parallel</groupId>
+        <artifactId>parallel-server-pipeline</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <name>Parallel Server Pipeline KTS</name>
+    <artifactId>parallel-server-pipeline-kts</artifactId>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-pipeline-commons</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+
+        <!--
+            Kotlin's JSR-223 wrapper around the embedded compiler.
+            Heavyweight (~50 MB of transitive jars: kotlin-scripting-jvm-host,
+            kotlin-compiler-embeddable, etc) - accepted cost for letting
+            instructors author real Kotlin scripts. The first script eval pays
+            a multi-second compiler warm-up; KtsVerdictExtension fires that
+            warm-up at startup so the first real submission isn't timed out.
+        -->
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-scripting-jsr223</artifactId>
+            <version>${kotlin.version}</version>
+        </dependency>
+    </dependencies>
+</project>

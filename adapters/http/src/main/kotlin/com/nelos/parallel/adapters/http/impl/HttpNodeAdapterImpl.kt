@@ -3,15 +3,19 @@ package com.nelos.parallel.adapters.http.impl
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.nelos.parallel.adapters.http.HttpNodeAdapter
+import com.nelos.parallel.commons.adapter.RunnerPick
 import com.nelos.parallel.commons.adapter.enums.TransportType
 import com.nelos.parallel.commons.adapter.exceptions.AdapterException
 import com.nelos.parallel.commons.adapter.vo.NodeInfo
 import com.nelos.parallel.commons.adapter.vo.findHttpConfig
-import com.nelos.parallel.commons.adapter.vo.request.*
+import com.nelos.parallel.commons.adapter.vo.request.ConfigUpdateRequest
+import com.nelos.parallel.commons.adapter.vo.request.TaskSubmission
 import com.nelos.parallel.commons.adapter.vo.response.*
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
+import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.body
 
@@ -75,17 +79,76 @@ class HttpNodeAdapterImpl(
                 ?: throw AdapterException("Empty response from node ${node.nodeId}")
         }
 
-    override fun healthCheck(node: NodeInfo): Boolean =
+    override fun healthCheck(node: NodeInfo): Boolean = probeHealth(node) == HealthStatus.ALIVE
+
+    /**
+     * HTTP is point-to-point: there's no broker fan-out, so we must commit to
+     * a specific endpoint. Probe each candidate; the first to respond is the
+     * live pick. Nodes that look genuinely dead (network failure, 5xx,
+     * connection refused) go in `dead` so the caller strips their HTTP
+     * transport from the registry; nodes that answer with 401 are skipped
+     * for THIS dispatch but NOT marked dead - the engine is reachable, the
+     * auth config is just off, and stripping the transport would lose that
+     * info on every subsequent submit.
+     */
+    override fun pickRunnerNode(candidates: List<NodeInfo>): RunnerPick {
+        val dead = mutableListOf<String>()
+        for (candidate in candidates) {
+            when (probeHealth(candidate)) {
+                HealthStatus.ALIVE -> return RunnerPick(live = candidate, deadNodes = dead)
+                HealthStatus.AUTH_FAILED -> LOG.warn(
+                    "Node {} returned 401 - auth misconfigured, skipping for this dispatch but " +
+                            "keeping the HTTP transport (node is reachable)",
+                    candidate.nodeId,
+                )
+
+                HealthStatus.DEAD -> dead.add(candidate.nodeId)
+            }
+        }
+        return RunnerPick(live = null, deadNodes = dead)
+    }
+
+    private fun probeHealth(node: NodeInfo): HealthStatus =
         try {
+            // /api/health is authenticated on the runner side just like every
+            // other endpoint - without the Bearer token we'd get a permanent
+            // 401 even from a perfectly healthy node, which previously stripped
+            // the HTTP transport on every poll.
             restClient.get()
                 .uri("${node.baseUrl}/api/health")
+                .authHeaders(node)
                 .retrieve()
                 .toBodilessEntity()
-            true
+            HealthStatus.ALIVE
+        } catch (e: HttpClientErrorException) {
+            if (e.statusCode == HttpStatus.UNAUTHORIZED || e.statusCode == HttpStatus.FORBIDDEN) {
+                LOG.debug(
+                    "Health check returned {} for node {} - treating as auth failure",
+                    e.statusCode, node.nodeId
+                )
+                HealthStatus.AUTH_FAILED
+            } else {
+                LOG.debug("Health check failed for node {}: {}", node.nodeId, e.message)
+                HealthStatus.DEAD
+            }
         } catch (e: Exception) {
+            // Connection refused, timeout, DNS, 5xx - any of these means the
+            // endpoint is unreachable / broken, not just misauthenticated.
             LOG.debug("Health check failed for node {}: {}", node.nodeId, e.message)
-            false
+            HealthStatus.DEAD
         }
+
+    /** Outcome of probing a node's `/api/health`. */
+    private enum class HealthStatus {
+        /** Endpoint responded 2xx. */
+        ALIVE,
+
+        /** Endpoint returned 401/403 - node is up, but our API key didn't match. */
+        AUTH_FAILED,
+
+        /** Connection refused, timeout, 5xx, DNS - endpoint is genuinely down. */
+        DEAD,
+    }
 
     override fun queueStatus(node: NodeInfo): QueueStatus =
         adapterCall("Failed to query queue status of node ${node.nodeId}") {

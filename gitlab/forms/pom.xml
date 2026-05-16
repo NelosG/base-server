@@ -21,6 +21,16 @@
         </dependency>
         <dependency>
             <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-pipeline-data</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-gitlab-integration</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
             <artifactId>parallel-server-gitlab-client</artifactId>
             <version>${parallel-server.version}</version>
         </dependency>

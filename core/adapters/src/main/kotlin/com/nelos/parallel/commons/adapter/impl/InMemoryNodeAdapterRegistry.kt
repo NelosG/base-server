@@ -17,5 +17,18 @@ class InMemoryNodeAdapterRegistry(adapters: List<NodeAdapter>) : NodeAdapterRegi
 
     private val map = adapters.associateBy { it.transportType }
 
+    override val adaptersInPreferenceOrder: List<NodeAdapter> =
+        PREFERENCE_ORDER.mapNotNull { map[it] }
+
     override fun findAdapter(type: TransportType): NodeAdapter? = map[type]
+
+    companion object {
+        /**
+         * Domain-level transport preference. AMQP first because Rabbit handles
+         * load-balancing across live consumers internally; HTTP is the
+         * point-to-point fallback that requires the orchestrator to pick a
+         * specific reachable endpoint.
+         */
+        private val PREFERENCE_ORDER = listOf(TransportType.AMQP, TransportType.HTTP)
+    }
 }

@@ -20,4 +20,10 @@ class UserDaoImpl : GenericDaoImpl<User>(), UserDao {
             cb.equal(root.get<String>(User::login.name), login)
         }.firstOrNull()
     }
+
+    @Transactional(propagation = Propagation.REQUIRED)
+    override fun findByLoginForUpdate(login: String): User? =
+        findByConditionForUpdate { cb, _, root ->
+            cb.equal(root.get<String>(User::login.name), login)
+        }.firstOrNull()
 }

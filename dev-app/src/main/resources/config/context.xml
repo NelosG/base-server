@@ -20,6 +20,16 @@
         <property name="maximumPoolSize" value="10"/>
         <property name="minimumIdle" value="2"/>
         <!--
+            -1 = never fail app startup because the DB is momentarily slow.
+            Hikari skips the initial-connection probe and lazy-connects on
+            first request. Without this, a transient SSL-handshake timeout
+            (the remote PG taking >30s to respond to enableSSL during a
+            cold start) crashes the boot - and the cure is just to restart.
+            App startup must be tolerant; failed queries will surface their
+            own errors when they actually run.
+        -->
+        <property name="initializationFailTimeout" value="-1"/>
+        <!--
             Lifetimes tuned for remote-PostgreSQL where a NAT/firewall on the
             path closes idle TCP earlier than HikariCP can keep it alive on
             its own. maxLifetime=120000 (2 min) recycles every connection
@@ -47,6 +57,21 @@
         <!-- Оптимизация для PostgreSQL -->
         <property name="dataSourceProperties">
             <props>
+                <!--
+                    JDBC-driver-side TCP-connect timeout (seconds). Without it
+                    the driver defaults to the OS connect timeout (minutes on
+                    Windows), so a routing hiccup can hang the whole boot.
+                -->
+                <prop key="connectTimeout">10</prop>
+                <!--
+                    Login-phase timeout (seconds) - covers the SSL handshake
+                    and auth roundtrip. The cold-start SocketTimeoutException
+                    we hit was inside enableSSL: the remote PG was slow to
+                    answer the SSL request. Bumping this from the default 0
+                    (which makes login fall back to socketTimeout=30) lets a
+                    sluggish handshake complete without dying.
+                -->
+                <prop key="loginTimeout">30</prop>
                 <prop key="socketTimeout">30</prop>
                 <prop key="tcpKeepAlive">true</prop>
                 <prop key="preparedStatementCacheQueries">256</prop>

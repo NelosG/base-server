@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.nelos.parallel.adapters.rabbit.RabbitConstants
 import com.nelos.parallel.commons.adapter.listener.TaskResultListenerRegistry
 import com.nelos.parallel.commons.adapter.vo.response.TaskResult
-import com.nelos.parallel.gitlab.pipeline.service.PipelineService
+import com.nelos.parallel.pipeline.commons.service.PipelineService
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.rabbit.annotation.RabbitListener
 import org.springframework.beans.factory.annotation.Autowired
@@ -49,8 +49,10 @@ class RabbitResultListener @Autowired constructor(
             LOG.error("Discarding malformed task result message: {}", e.message)
             return
         }
-        LOG.info("Received AMQP task result for job {} from node {}: {}",
-            result.jobId, result.nodeId, result.status)
+        LOG.info(
+            "Received AMQP task result for job {} from node {}: {}",
+            result.jobId, result.nodeId, result.status
+        )
         pipelineService.handleResult(result)
         try {
             listenerRegistry.dispatch(result)  // adapter-test UI hook
