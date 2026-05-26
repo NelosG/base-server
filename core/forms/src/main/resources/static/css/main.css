@@ -235,6 +235,12 @@ code, kbd, .font-mono {
     margin-bottom: 0.3rem;
 }
 
+.form-label.required::after {
+    content: " *";
+    color: var(--prl-red);
+    font-weight: 700;
+}
+
 /* -- Buttons ------------------------------------------------------- */
 
 .btn {

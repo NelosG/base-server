@@ -22,21 +22,14 @@ import java.time.Duration
  * @since %CURRENT_VERSION%
  */
 @Service("prl.gitLabApiClient")
-class GitLabApiClientImpl(
-    @Value("\${gitlab.url}") private val gitlabUrl: String,
-    @Value("\${gitlab.api.token}") private val apiToken: String,
+class GitLabApiClientImpl internal constructor(
+    private val restClient: RestClient,
 ) : GitLabApiClient {
 
-    // Explicit timeouts - JDK defaults are unlimited, a hung GitLab call would
-    // block the Tomcat worker forever.
-    private val restClient: RestClient = RestClient.builder()
-        .baseUrl(gitlabUrl)
-        .defaultHeader(PRIVATE_TOKEN_HEADER, apiToken)
-        .requestFactory(SimpleClientHttpRequestFactory().apply {
-            setConnectTimeout(Duration.ofSeconds(5))
-            setReadTimeout(Duration.ofSeconds(30))
-        })
-        .build()
+    constructor(
+        @Value("\${gitlab.url}") gitlabUrl: String,
+        @Value("\${gitlab.api.token}") apiToken: String,
+    ) : this(defaultRestClient(gitlabUrl, apiToken))
 
     override fun forkProject(projectPath: String, targetNamespace: String): GitLabProjectInfo {
         return restClient.post()
@@ -121,5 +114,17 @@ class GitLabApiClientImpl(
 
         private fun projectUri(projectPath: String, suffix: String = ""): URI =
             URI.create("/api/v4/projects/${encode(projectPath)}$suffix")
+
+        // Explicit timeouts - JDK defaults are unlimited, a hung GitLab call
+        // would block the Tomcat worker forever.
+        private fun defaultRestClient(gitlabUrl: String, apiToken: String): RestClient =
+            RestClient.builder()
+                .baseUrl(gitlabUrl)
+                .defaultHeader(PRIVATE_TOKEN_HEADER, apiToken)
+                .requestFactory(SimpleClientHttpRequestFactory().apply {
+                    setConnectTimeout(Duration.ofSeconds(5))
+                    setReadTimeout(Duration.ofSeconds(30))
+                })
+                .build()
     }
 }

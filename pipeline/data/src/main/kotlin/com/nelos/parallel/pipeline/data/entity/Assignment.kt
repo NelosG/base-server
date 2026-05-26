@@ -44,6 +44,9 @@ class Assignment : CodeEntity() {
     @get:Column(name = "max_processes")
     var maxProcesses: Int? = null
 
+    @get:Column(name = "warmup_iterations")
+    var warmupIterations: Int? = null
+
     @get:Column(name = "active")
     var active: Boolean = true
 

@@ -79,7 +79,10 @@ class DbNodeRegistry(
 
     @Transactional(propagation = Propagation.REQUIRED)
     override fun deregister(nodeId: String): Boolean {
-        val existing = nodeService.findByNodeId(nodeId) ?: run {
+        // FOR UPDATE: a concurrent removeTransport/deregister blocks here so we
+        // never call remove() on a row another tx already deleted (which would
+        // surface as a Hibernate StaleObjectStateException).
+        val existing = nodeService.findByNodeIdForUpdate(nodeId) ?: run {
             LOG.debug("Node not found for deregistration: {}", nodeId)
             return false
         }
@@ -125,9 +128,15 @@ class DbNodeRegistry(
     @Transactional(propagation = Propagation.REQUIRED)
     override fun updateNode(node: NodeInfo): NodeInfo {
         val existing = nodeService.findByNodeIdForUpdate(node.nodeId)
-        val entity = existing ?: Node()
-        entity.applyFrom(node)
-        val saved = nodeService.save(entity).toNodeInfo()
+        if (existing == null) {
+            // Concurrent deletion between caller's snapshot and our lock: fall back
+            // to the full register path so we run evictByEndpoint and the timestamp
+            // guard rather than silently ghost-inserting.
+            LOG.warn("updateNode: node {} no longer exists, falling back to register", node.nodeId)
+            return register(node)
+        }
+        existing.applyFrom(node)
+        val saved = nodeService.save(existing).toNodeInfo()
         scheduleInvalidate()
         return saved
     }
@@ -146,7 +155,9 @@ class DbNodeRegistry(
                 existingHttp.host == host && existingHttp.port == port
             } ?: return
 
-        val staleEntity = nodeService.findByNodeId(stale.nodeId) ?: return
+        // FOR UPDATE on the stale row: serializes against a concurrent register
+        // of the same nodeId so we don't delete a row another tx just refreshed.
+        val staleEntity = nodeService.findByNodeIdForUpdate(stale.nodeId) ?: return
         nodeService.remove(staleEntity)
         LOG.info("Evicted stale node {} (same endpoint {}:{})", stale.nodeId, host, port)
         scheduleInvalidate()
@@ -182,8 +193,39 @@ class DbNodeRegistry(
     ): List<TransportInfo>? {
         if (incoming.isNullOrEmpty()) return existing
         val byType = (existing ?: emptyList()).associateBy { it.type }.toMutableMap()
-        incoming.forEach { byType[it.type] = it }
+        incoming.forEach { incomingT ->
+            val prev = byType[incomingT.type]
+            byType[incomingT.type] = if (prev == null) incomingT else mergeTransport(prev, incomingT)
+        }
         return byType.values.toList()
+    }
+
+    /**
+     * Field-level merge so a re-registration that omits a field (e.g. runner re-sends
+     * host+port without `authToken`) doesn't wipe the previously-stored value. Same
+     * type is required on both sides; a type change wholesale replaces the config.
+     */
+    private fun mergeTransport(prev: TransportInfo, incoming: TransportInfo): TransportInfo =
+        TransportInfo(
+            type = incoming.type,
+            status = incoming.status ?: prev.status,
+            config = mergeConfig(prev.config, incoming.config),
+        )
+
+    private fun mergeConfig(prev: TransportConfig?, incoming: TransportConfig?): TransportConfig? = when {
+        prev == null -> incoming
+        incoming == null -> prev
+        prev is TransportConfig.HttpConfig && incoming is TransportConfig.HttpConfig -> TransportConfig.HttpConfig(
+            host = incoming.host ?: prev.host,
+            port = incoming.port ?: prev.port,
+            authToken = incoming.authToken ?: prev.authToken,
+        )
+        prev is TransportConfig.AmqpConfig && incoming is TransportConfig.AmqpConfig -> TransportConfig.AmqpConfig(
+            host = incoming.host ?: prev.host,
+            port = incoming.port ?: prev.port,
+            vhost = incoming.vhost ?: prev.vhost,
+        )
+        else -> incoming
     }
 
     private fun Node.toNodeInfo(): NodeInfo = NodeInfo(

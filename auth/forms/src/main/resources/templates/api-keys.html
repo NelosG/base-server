@@ -27,7 +27,7 @@
                     <div class="alert d-none" id="create-alert"></div>
                     <div class="row align-items-end">
                         <div class="col-md-8">
-                            <label class="form-label" for="key-name">Key Name</label>
+                            <label class="form-label required" for="key-name">Key Name</label>
                             <input class="form-control" id="key-name" placeholder="e.g. test-runner-prod" type="text">
                         </div>
                         <div class="col-md-4 mt-2 mt-md-0">
@@ -117,11 +117,13 @@
 
                 const actTd = document.createElement("td");
                 actTd.appendChild(Prl.el("button", {
-                    className: "btn btn-sm btn-outline-danger",
-                    onClick: () => Prl.confirmCall("Delete this API key?",
-                        SVC, "deleteApiKey", [{id: k.id}], () => Prl.reloadList()),
+                    className: "btn btn-sm btn-outline-danger", text: "Delete",
+                    onClick: () => Prl.confirmCall(
+                        "Delete API key '" + (k.name || k.keyPrefix) + "'? Any service using it will stop working.",
+                        SVC, "deleteApiKey", [{id: k.id}], () => Prl.reloadList(),
+                    ),
                 }));
-                actTd.lastChild.appendChild(Prl.el("i", {className: "bi bi-trash"}));
+                tr.appendChild(actTd);
                 return tr;
             }
 

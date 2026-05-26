@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark" lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta content="width=device-width, initial-scale=1.0" name="viewport">
+        <link href="/favicon.svg" rel="icon" type="image/svg+xml">
+        <title>Runners</title>
+        <link href="/webjars/bootstrap/5.3.8/css/bootstrap.min.css" rel="stylesheet"/>
+        <link href="/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.css" rel="stylesheet"/>
+        <link href="/css/main.css" rel="stylesheet"/>
+        <script src="/js/view-engine.js"></script>
+        <script src="/js/prl-utils.js"></script>
+        <script src="/js/navbar.js"></script>
+    </head>
+    <body>
+
+        <div class="container mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="mb-0"><i class="bi bi-cpu"></i> Runners</h3>
+                <small class="text-muted">Higher priority value runs first (default 0); equal priorities round-robin.</small>
+            </div>
+
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                Only runners shipped with this build appear here. To add a runner type, include its Maven module in
+                <code>dev-app/pom.xml</code> and restart the server. Configuration is persisted in
+                <code>prl_runner_config</code>.
+            </div>
+
+            <div class="alert d-none" id="status-alert"></div>
+
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0"
+                               data-prl-empty="#empty"
+                               data-prl-list="prl.runnerConfigViewService.list"
+                               data-prl-row="runnerRow">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Available</th>
+                                    <th style="width: 7rem;">Enabled</th>
+                                    <th style="width: 9rem;">Priority</th>
+                                    <th>Settings (JSON)</th>
+                                    <th style="width: 8rem;"></th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="text-center text-muted p-3 d-none" id="empty">No runners shipped in this build.</div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const SVC = "prl.runnerConfigViewService";
+
+            function settingsHint(type) {
+                switch (type) {
+                    case "LOCAL":
+                        return '{"binaryPath":"C:/path/to/cli.exe","workdirBase":"C:/tmp/parallel-cli","maxConcurrent":1}';
+                    case "DOCKER":
+                        return '{"imageName":"ctr:latest","dockerBinary":"docker","workdirBase":"/tmp/parallel-docker","maxConcurrent":1}';
+                    default:
+                        return "(no settings - this runner reads live node state)";
+                }
+            }
+
+            function runnerRow(r) {
+                const tr = document.createElement("tr");
+                tr.setAttribute("data-runner-name", r.name);
+
+                tr.appendChild(Prl.td(r.name));
+                tr.appendChild(Prl.td(r.type));
+
+                const availTd = document.createElement("td");
+                availTd.appendChild(Prl.el("span", {
+                    className: "badge " + (r.available ? "bg-success" : "bg-secondary"),
+                    text: r.available ? "yes" : "no",
+                }));
+                tr.appendChild(availTd);
+
+                const enabledTd = document.createElement("td");
+                const enabledInput = document.createElement("input");
+                enabledInput.type = "checkbox";
+                enabledInput.className = "form-check-input";
+                enabledInput.checked = r.enabled;
+                enabledInput.setAttribute("data-prl-runner-enabled", "");
+                enabledTd.appendChild(enabledInput);
+                tr.appendChild(enabledTd);
+
+                const prioTd = document.createElement("td");
+                const prioInput = document.createElement("input");
+                prioInput.type = "number";
+                prioInput.className = "form-control form-control-sm";
+                prioInput.value = r.priority;
+                prioInput.min = "0";
+                prioInput.setAttribute("data-prl-runner-priority", "");
+                prioTd.appendChild(prioInput);
+                tr.appendChild(prioTd);
+
+                const settingsTd = document.createElement("td");
+                if (r.hasSettings) {
+                    const settingsInput = document.createElement("textarea");
+                    settingsInput.className = "form-control form-control-sm font-monospace";
+                    settingsInput.rows = 2;
+                    settingsInput.placeholder = settingsHint(r.type);
+                    settingsInput.value = r.settingsJson || "";
+                    settingsInput.setAttribute("data-prl-runner-settings", "");
+                    settingsTd.appendChild(settingsInput);
+                } else {
+                    const note = document.createElement("span");
+                    note.className = "text-muted fst-italic";
+                    note.textContent = "no settings - configured via node registry";
+                    settingsTd.appendChild(note);
+                }
+                tr.appendChild(settingsTd);
+
+                const actionsTd = document.createElement("td");
+                const saveBtn = document.createElement("button");
+                saveBtn.className = "btn btn-sm btn-primary";
+                const saveIcon = document.createElement("i");
+                saveIcon.className = "bi bi-save";
+                saveBtn.appendChild(saveIcon);
+                saveBtn.appendChild(document.createTextNode(" Save"));
+                saveBtn.addEventListener("click", () => saveRow(tr, r));
+                actionsTd.appendChild(saveBtn);
+                tr.appendChild(actionsTd);
+
+                return tr;
+            }
+
+            function saveRow(tr, r) {
+                const enabled = tr.querySelector("[data-prl-runner-enabled]").checked;
+                const priority = parseInt(tr.querySelector("[data-prl-runner-priority]").value, 10);
+                const settingsInput = tr.querySelector("[data-prl-runner-settings]");
+                const rawSettings = settingsInput ? settingsInput.value.trim() : "";
+                if (Number.isNaN(priority)) {
+                    Prl.alert("#status-alert", "danger", "Priority must be a number");
+                    return;
+                }
+                // Friendly client-side hint; the server validates again.
+                if (rawSettings) {
+                    try { JSON.parse(rawSettings); }
+                    catch (e) {
+                        Prl.alert("#status-alert", "danger", "Settings must be valid JSON: " + e.message);
+                        return;
+                    }
+                }
+                ViewEngine.call(SVC, "save", [{
+                    name: r.name,
+                    enabled: enabled,
+                    priority: priority,
+                    settingsJson: rawSettings || null,
+                }]).then(() => {
+                    Prl.alert("#status-alert", "success", "Saved " + r.name);
+                    Prl.reloadList();
+                }).catch(err => {
+                    Prl.alert("#status-alert", "danger", "Save failed: " + (err && err.message ? err.message : err));
+                });
+            }
+        </script>
+    </body>
+</html>

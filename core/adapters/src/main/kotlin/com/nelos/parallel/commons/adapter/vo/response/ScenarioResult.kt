@@ -17,4 +17,8 @@ class ScenarioResult @JsonCreator constructor(
     @param:JsonProperty("name") val name: String,
     @param:JsonProperty("tests") val tests: List<TestEntry>,
     @param:JsonProperty("metrics") val metrics: ScenarioMetrics? = null,
+    // Per-scenario aggregate of the same shape as job-wide ResultSummary.<group>,
+    // computed over this scenario's runs. metrics stays - it's a single T1-vs-Tp
+    // pair, summary carries the full thread-count ladder.
+    @param:JsonProperty("summary") val summary: TestSummary? = null,
 )

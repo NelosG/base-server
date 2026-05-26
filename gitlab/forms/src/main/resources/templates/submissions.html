@@ -27,20 +27,22 @@
                     <div class="row g-2">
                         <div class="col-md-6">
                             <label class="form-label" for="user-filter">Student</label>
-                            <select class="form-select" data-prl-args="[null]"
-                                    data-prl-label-fn="studentLabel"
-                                    data-prl-options="prl.studentViewService.getStudents"
-                                    id="user-filter">
-                                <option value="">All students</option>
-                            </select>
+                            <input class="form-control" id="user-filter" type="text"
+                                   data-prl-search-select="prl.studentViewService.getStudents"
+                                   data-prl-args="[null]"
+                                   data-prl-value="id"
+                                   data-prl-label="studentLabel"
+                                   data-prl-all-label="All students"
+                                   placeholder="Type to search students...">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="assignment-filter">Assignment</label>
-                            <select class="form-select" data-prl-label-fn="assignmentLabel"
-                                    data-prl-options="prl.assignmentViewService.getAssignments"
-                                    id="assignment-filter">
-                                <option value="">All assignments</option>
-                            </select>
+                            <input class="form-control" id="assignment-filter" type="text"
+                                   data-prl-search-select="prl.assignmentViewService.getAssignments"
+                                   data-prl-value="id"
+                                   data-prl-label="assignmentLabel"
+                                   data-prl-all-label="All assignments"
+                                   placeholder="Type to search assignments...">
                         </div>
                     </div>
                 </div>
@@ -78,8 +80,8 @@
         <script>
             function filterArgs() {
                 return [
-                    Prl.parseLong(Prl.val("#user-filter")),
-                    Prl.parseLong(Prl.val("#assignment-filter")),
+                    Prl.parseLong(Prl.dataVal("#user-filter")),
+                    Prl.parseLong(Prl.dataVal("#assignment-filter")),
                 ];
             }
 

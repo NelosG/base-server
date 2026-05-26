@@ -12,6 +12,7 @@ CREATE TABLE prl_assignment
     wall_time_sec       int,
     cpu_time_sec        int,
     max_processes       int,
+    warmup_iterations   int,
     active              boolean      NOT NULL DEFAULT TRUE,
     evaluator_script    jsonb,
     CONSTRAINT uk_prl_assignment_code UNIQUE (code)
@@ -122,3 +123,5 @@ ALTER SEQUENCE seq_prl_submission_log OWNER TO nelos;
 -- would otherwise never land.
 ALTER TABLE prl_assignment
     ADD COLUMN IF NOT EXISTS evaluator_script jsonb;
+ALTER TABLE prl_assignment
+    ADD COLUMN IF NOT EXISTS warmup_iterations int;

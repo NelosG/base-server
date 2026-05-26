@@ -17,6 +17,7 @@
         <module>commons</module>
         <module>data</module>
         <module>core</module>
+        <module>runner</module>
         <module>forms</module>
         <module>kts</module>
         <module>python</module>

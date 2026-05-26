@@ -103,9 +103,18 @@ class StudentViewService(
     }
 
     @Transactional
-    fun updateStudent(id: Long, displayName: String?, gitlabName: String?): StudentView {
+    fun updateStudent(id: Long, login: String? = null, displayName: String?, gitlabName: String?): StudentView {
         val user = userService.tryFindById(id) ?: error("Student $id not found")
         if (user.type != UserType.STUDENT) error("User $id is not a student")
+        if (login != null) {
+            val trimmed = login.trim().takeIf { it.isNotBlank() } ?: error("login must not be blank")
+            if (trimmed != user.login) {
+                val taken = userService.findByLogin(trimmed)
+                if (taken != null && taken.id != id) error("user with login '$trimmed' already exists")
+                user.login = trimmed
+                userService.save(user)
+            }
+        }
         if (displayName != null) {
             // Skip the write entirely when the incoming value is blank or already matches -
             // avoids issuing a no-op UPDATE for an otherwise untouched row.

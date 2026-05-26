@@ -80,9 +80,10 @@ class WebSecurityConfig @Autowired constructor(
                     .requestMatchers("/webjars/**", "/css/**", "/js/**", "/images/**").permitAll()
                     .requestMatchers(
                         "/admin", "/admin/**",
-                        "/api-keys", "/adapter-http-test", "/adapter-rabbit-test",
+                        "/api-keys", "/adapter-http", "/adapter-rabbit",
                         "/students", "/student", "/student-groups", "/assignments",
                         "/submissions",
+                        "/runners",
                         "/api/students/**",
                     ).hasAuthority(AppRole.ROLE_ADMIN)
                     .requestMatchers("/my-submissions").hasAuthority(AppRole.ROLE_STUDENT)

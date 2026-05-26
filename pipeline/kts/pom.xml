@@ -21,16 +21,37 @@
         </dependency>
 
         <!--
-            Kotlin's JSR-223 wrapper around the embedded compiler.
-            Heavyweight (~50 MB of transitive jars: kotlin-scripting-jvm-host,
-            kotlin-compiler-embeddable, etc) - accepted cost for letting
-            instructors author real Kotlin scripts. The first script eval pays
-            a multi-second compiler warm-up; KtsVerdictExtension fires that
-            warm-up at startup so the first real submission isn't timed out.
+            Kotlin's native scripting host (not the legacy JSR-223 wrapper).
+            JSR-223 wraps every script as a REPL line and trips the IR phase
+            on non-trivial inputs (Backend Internal error: psi2ir / noScope);
+            scripting-jvm-host compiles each script as a standalone unit and
+            is reliable on Kotlin 2.x. Pulls ~45 MB of transitives
+            (kotlin-compiler-embeddable, kotlin-scripting-common, etc) -
+            accepted cost for letting instructors author real Kotlin scripts.
+            The first script eval pays a multi-second compiler warm-up;
+            KtsVerdictExtension fires that warm-up at startup so the first
+            real submission isn't timed out.
         -->
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
-            <artifactId>kotlin-scripting-jsr223</artifactId>
+            <artifactId>kotlin-scripting-jvm-host</artifactId>
+            <version>${kotlin.version}</version>
+        </dependency>
+        <!--
+            kotlin-scripting-jvm-host pulls these transitively but at runtime
+            scope only. We compile against their public types (KotlinScript,
+            ScriptCompilationConfiguration, dependenciesFromCurrentContext,
+            ResultWithDiagnostics, ScriptDiagnostic, ...) so they must be on
+            the compile classpath too.
+        -->
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-scripting-common</artifactId>
+            <version>${kotlin.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-scripting-jvm</artifactId>
             <version>${kotlin.version}</version>
         </dependency>
     </dependencies>

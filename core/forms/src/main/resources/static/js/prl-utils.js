@@ -45,6 +45,16 @@ const Prl = {
         Object.keys(map).forEach(k => Prl.setText(k, map[k]));
     },
 
+    /**
+     * Reads the chosen value from a `prlSearchSelect` input. The visible
+     * `.value` holds the label; the picked value lives in `data-value`.
+     * Returns "" when nothing is picked.
+     */
+    dataVal(selector) {
+        const el = Prl.$(selector);
+        return el ? (el.getAttribute("data-value") || "") : "";
+    },
+
     /** Reads `.value` from an `<input>`/`<select>`. Returns "" when missing. */
     val(selector) {
         const el = Prl.$(selector);
@@ -465,6 +475,9 @@ function prlList(opts) {
         if (empty) empty.classList.add("d-none");
         items.forEach(item => tbody.appendChild(opts.row(item)));
         if (hasMore) appendLoadMoreRow();
+        // Re-apply any text filter on the page so a search that was in effect
+        // before the reload keeps hiding the same set without user input.
+        if (typeof Prl.reapplyListFilters === "function") Prl.reapplyListFilters();
     };
 
     const reload = () => {
@@ -569,7 +582,12 @@ prlList.autoBind = function () {
  *             [data-prl-alert="#alert"]>Save</button>
  */
 function prlForm(opts) {
-    Prl.$(opts.button).addEventListener("click", () => {
+    const btn = Prl.$(opts.button);
+    btn.addEventListener("click", () => {
+        // Disable for the duration of the request so a double-click can't
+        // submit the same payload twice (creating duplicate students /
+        // assignments / etc on the backend before the first save settles).
+        if (btn.disabled) return;
         Prl.hideAlert(opts.alert);
         const err = opts.validate && opts.validate();
         if (err) {
@@ -577,13 +595,18 @@ function prlForm(opts) {
             return;
         }
         const args = opts.args ? opts.args() : [];
+        btn.disabled = true;
         ViewEngine.call(opts.svc, opts.method, args).then(result => {
             if (opts.successMessage) Prl.alert(opts.alert, "success", opts.successMessage);
             if (opts.onSuccess) opts.onSuccess(result);
             if (opts.redirect) setTimeout(() => {
                 window.location.href = opts.redirect;
             }, opts.redirectDelay || 0);
-        }).catch(err => Prl.alert(opts.alert, "danger", err.message || "Failed"));
+        }).catch(err => {
+            Prl.alert(opts.alert, "danger", err.message || "Failed");
+        }).finally(() => {
+            btn.disabled = false;
+        });
     });
 }
 
@@ -641,6 +664,278 @@ const prlOptions = {
         });
     },
 };
+
+// ============================================================================
+// prlSearchSelect - searchable single-select combobox built on a text <input>
+// ============================================================================
+
+/**
+ * Wires an `<input>` carrying `data-prl-search-select="svc.method"` as a
+ * searchable single-select. The list is fetched once on bind; typing filters
+ * the dropdown client-side; picking writes the value into `data-value` and
+ * dispatches a synthetic `change` event so existing `data-prl-reload-on`
+ * wiring keeps working unchanged.
+ *
+ *     <input type="text" id="group-filter"
+ *            data-prl-search-select="prl.studentGroupViewService.getGroups"
+ *            data-prl-args="[]"
+ *            data-prl-value="id"
+ *            data-prl-label="name"
+ *            data-prl-all-label="All groups"
+ *            data-prl-extra='[{"value":-1,"label":"- Without group -"}]'>
+ *
+ * Page code reads the picked id with `Prl.dataVal("#group-filter")`. The
+ * visible input text is the label; `data-value` holds the chosen value.
+ * Empty input (cleared) means "no selection" - `data-value` is "".
+ */
+const prlSearchSelect = {
+    autoBind() {
+        document.querySelectorAll("[data-prl-search-select]").forEach(input => {
+            const [svc, method] = Prl.splitTarget(input.dataset.prlSearchSelect);
+            let args;
+            try {
+                args = input.dataset.prlArgs ? JSON.parse(input.dataset.prlArgs) : [];
+            } catch (e) {
+                console.error("prlSearchSelect: invalid JSON in data-prl-args on", input, e);
+                return;
+            }
+            const valueKey = input.dataset.prlValue || "id";
+            const labelKey = input.dataset.prlLabel || "name";
+            // Lazy resolution: page-defined formatter functions may not be on
+            // window at autoBind time depending on script order. Re-check on
+            // every item so the moment the function is defined we pick it up.
+            const resolveFn = key => {
+                if (typeof window[key] === "function") return window[key];
+                if (Prl[key] && typeof Prl[key] === "function") return Prl[key];
+                return null;
+            };
+            const valueFn = it => {
+                const f = resolveFn(valueKey);
+                return f ? f(it) : it[valueKey];
+            };
+            const labelFn = it => {
+                const f = resolveFn(labelKey);
+                return f ? f(it) : it[labelKey];
+            };
+            const allLabel = input.dataset.prlAllLabel || "";
+            let extra = [];
+            if (input.dataset.prlExtra) {
+                try {
+                    extra = JSON.parse(input.dataset.prlExtra) || [];
+                } catch (e) {
+                    console.error("prlSearchSelect: invalid JSON in data-prl-extra on", input, e);
+                }
+            }
+
+            ViewEngine.call(svc, method, args).then(items => {
+                prlSearchSelect._attach(input, items || [], valueFn, labelFn, allLabel, extra);
+            }).catch(err => {
+                console.error("prlSearchSelect load failed: " + svc + "." + method, err);
+            });
+        });
+    },
+
+    _attach(input, items, valueFn, labelFn, allLabel, extra) {
+        // Normalise to a flat [{value, label}] list with the "all/none" option first.
+        const options = [];
+        if (allLabel) options.push({value: "", label: allLabel});
+        extra.forEach(o => options.push({value: o.value, label: o.label}));
+        items.forEach(it => options.push({value: valueFn(it), label: String(labelFn(it) ?? "")}));
+
+        input.setAttribute("autocomplete", "off");
+        if (!input.getAttribute("data-value")) input.setAttribute("data-value", "");
+        if (input.value === "" && allLabel) input.value = allLabel;
+
+        const dropdown = document.createElement("div");
+        dropdown.className = "list-group position-absolute w-100 shadow";
+        dropdown.style.display = "none";
+        // 1050 = above Bootstrap navbar/sticky elements. Anything lower can
+        // be hidden by sibling cards once the dropdown overflows its own
+        // card.
+        dropdown.style.zIndex = "1050";
+        dropdown.style.maxHeight = "240px";
+        dropdown.style.overflowY = "auto";
+
+        // Float the dropdown over the input - wrap if the parent isn't
+        // positioned, and lift the surrounding card above its siblings so
+        // overflowing dropdown items don't slip behind the next card.
+        const parent = input.parentElement;
+        if (parent && getComputedStyle(parent).position === "static") {
+            parent.style.position = "relative";
+        }
+        const card = input.closest(".card");
+        if (card) {
+            card.style.position = "relative";
+            // Keep above later cards in document flow; 1040 < 1050 so the
+            // dropdown still beats the card's own header/etc.
+            if (!card.style.zIndex || parseInt(card.style.zIndex, 10) < 1040) {
+                card.style.zIndex = "1040";
+            }
+        }
+        parent.appendChild(dropdown);
+
+        function pick(opt) {
+            input.value = opt.label;
+            input.setAttribute("data-value", opt.value == null ? "" : String(opt.value));
+            close();
+            input.dispatchEvent(new Event("change", {bubbles: true}));
+        }
+
+        function close() {
+            dropdown.style.display = "none";
+        }
+
+        function render(filter) {
+            dropdown.replaceChildren();
+            const q = (filter || "").trim().toLowerCase();
+            const matches = (!q ? options : options.filter(o => (o.label || "").toLowerCase().indexOf(q) !== -1));
+            if (matches.length === 0) {
+                dropdown.appendChild(Prl.el("div", {
+                    className: "list-group-item text-muted small",
+                    text: "No matches",
+                }));
+            } else {
+                matches.slice(0, 100).forEach(opt => {
+                    const btn = Prl.el("button", {
+                        className: "list-group-item list-group-item-action text-truncate",
+                        text: opt.label,
+                    });
+                    btn.type = "button";
+                    btn.addEventListener("mousedown", e => {
+                        e.preventDefault();
+                        pick(opt);
+                    });
+                    dropdown.appendChild(btn);
+                });
+            }
+            dropdown.style.display = "block";
+        }
+
+        input.addEventListener("input", () => {
+            // Typing only filters the dropdown - the chosen value (data-value)
+            // changes only on an explicit pick. Otherwise blurring after a
+            // half-typed query would silently clear the filter without
+            // reloading the dependent list.
+            render(input.value);
+        });
+        input.addEventListener("focus", () => {
+            // Clear the visible label on focus so the user can start typing
+            // immediately. Without this they'd be appending after the current
+            // pick's label (e.g. "All studentsXYZ") and get zero matches.
+            // The picked value is kept in data-value and restored on blur if
+            // no new option is chosen.
+            input.value = "";
+            render("");
+            input.select();
+        });
+        // After a pick, focus stays on the input but the dropdown was closed.
+        // Clicking the input again wouldn't fire `focus` (still focused), so
+        // listen for clicks to re-open. Re-rendering with the current value
+        // is safe since "input" / "focus" do the same.
+        input.addEventListener("click", () => {
+            if (dropdown.style.display === "none") {
+                if (document.activeElement === input) input.value = "";
+                render("");
+            }
+        });
+        input.addEventListener("blur", () => setTimeout(() => {
+            close();
+            // Snap the visible label back to whatever the current pick says,
+            // so a half-typed query doesn't linger in the input.
+            const cur = input.getAttribute("data-value") || "";
+            const found = options.find(o => String(o.value) === String(cur));
+            input.value = found ? found.label : (allLabel || "");
+        }, 150));
+        input.addEventListener("keydown", e => {
+            if (e.key === "Escape") {
+                close();
+                input.blur();
+            }
+        });
+    },
+};
+
+// ============================================================================
+// prlListFilter - simple text-substring filter over a static node list
+// ============================================================================
+
+/**
+ * Hide/show DOM nodes matching a CSS selector based on the substring of an
+ * `<input>`. Each candidate node must carry its own `data-search` attribute
+ * (lower-cased haystack of searchable fields); the filter is case-insensitive
+ * and matches anywhere in that string. Using a pre-built attribute beats
+ * scanning `textContent` because the latter also picks up badge labels
+ * ("Active") and column values you didn't want to be searchable.
+ *
+ * Programmatic:
+ *
+ *     const apply = Prl.attachListFilter("#search-input", ".my-item");
+ *     // ...later, after re-rendering rows:
+ *     apply();
+ *
+ * Declarative - add the attribute to the input and forget about wiring:
+ *
+ *     <input id="search" data-prl-list-filter=".my-item">
+ *
+ * Returns the apply() function so callers that re-render the target nodes
+ * (e.g. inside a `data-prl-list` reload) can re-apply the current filter.
+ */
+Prl.attachListFilter = function (input, itemsSelector) {
+    const el = typeof input === "string" ? document.querySelector(input) : input;
+    if (!el) return () => {};
+    const apply = () => {
+        const q = (el.value || "").trim().toLowerCase();
+        document.querySelectorAll(itemsSelector).forEach(node => {
+            const hay = node.getAttribute("data-search") || "";
+            const visible = !q || hay.indexOf(q) !== -1;
+            // setProperty with `important` beats Bootstrap's `d-flex` / `d-block`
+            // classes (they're `display: ... !important` and a plain inline
+            // style.display would lose the specificity match).
+            if (visible) node.style.removeProperty("display");
+            else node.style.setProperty("display", "none", "important");
+        });
+    };
+    el.addEventListener("input", apply);
+    el.prlListFilterApply = apply;
+    return apply;
+};
+
+/**
+ * Re-applies every `data-prl-list-filter` on the page. Call after a
+ * `data-prl-list` table reloads its rows so the active search keeps hiding
+ * the same set without the user touching the input.
+ */
+Prl.reapplyListFilters = function () {
+    document.querySelectorAll("[data-prl-list-filter]").forEach(input => {
+        if (typeof input.prlListFilterApply === "function") input.prlListFilterApply();
+    });
+};
+
+const prlListFilter = {
+    autoBind() {
+        document.querySelectorAll("[data-prl-list-filter]").forEach(input => {
+            Prl.attachListFilter(input, input.dataset.prlListFilter);
+        });
+    },
+};
+
+// Catch-all input delegation - handles the corner case where the input
+// element gets re-created after autoBind() ran (e.g. dynamically-rendered
+// forms) or autoBind missed the element because it appeared later. The
+// listener fires unconditionally on every input event in the document; it
+// only does work when the source carries data-prl-list-filter.
+document.addEventListener("input", function (e) {
+    const t = e.target;
+    if (t && t.getAttribute && t.getAttribute("data-prl-list-filter")) {
+        const q = (t.value || "").trim().toLowerCase();
+        document.querySelectorAll(t.getAttribute("data-prl-list-filter")).forEach(node => {
+            const hay = node.getAttribute("data-search") || "";
+            const visible = !q || hay.indexOf(q) !== -1;
+            if (visible) node.style.removeProperty("display");
+            else node.style.setProperty("display", "none", "important");
+        });
+    }
+});
 
 // ============================================================================
 // prlDetail - declarative one-shot detail loader
@@ -706,6 +1001,8 @@ const prlDetail = {
 
 document.addEventListener("DOMContentLoaded", () => {
     prlOptions.autoBind();
+    prlSearchSelect.autoBind();
+    prlListFilter.autoBind();
     prlList.autoBind();
     prlForm.autoBind();
     prlDetail.autoBind();

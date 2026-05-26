@@ -18,6 +18,7 @@ class EffectiveParams @JsonCreator constructor(
     @param:JsonProperty("wallTimeSec") val wallTimeSec: Int? = null,
     @param:JsonProperty("cpuTimeSec") val cpuTimeSec: Int? = null,
     @param:JsonProperty("maxProcesses") val maxProcesses: Int? = null,
+    @param:JsonProperty("warmupIterations") val warmupIterations: Int? = null,
     @param:JsonProperty("testSourceType") val testSourceType: String? = null,
     @param:JsonProperty("solutionSourceType") val solutionSourceType: String? = null,
     @param:JsonProperty("hasCMakeLists") val hasCMakeLists: Boolean? = null,

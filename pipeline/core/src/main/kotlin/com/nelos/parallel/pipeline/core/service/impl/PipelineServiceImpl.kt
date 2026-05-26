@@ -10,6 +10,7 @@ import com.nelos.parallel.jobs.entity.Job
 import com.nelos.parallel.jobs.enums.JobStatus
 import com.nelos.parallel.jobs.service.JobService
 import com.nelos.parallel.pipeline.commons.enums.SubmissionStatus
+import com.nelos.parallel.pipeline.commons.event.SubmissionTerminalEvent
 import com.nelos.parallel.pipeline.commons.service.*
 import com.nelos.parallel.pipeline.commons.vo.PipelineStatusResponse
 import com.nelos.parallel.pipeline.commons.vo.PipelineSubmitRequest
@@ -20,8 +21,14 @@ import com.nelos.parallel.pipeline.data.service.AssignmentService
 import com.nelos.parallel.pipeline.data.service.SubmissionLogService
 import com.nelos.parallel.pipeline.data.service.SubmissionResultService
 import com.nelos.parallel.pipeline.data.service.SubmissionService
+import com.nelos.parallel.pipeline.runner.exception.NoRunnerAvailableException
+import com.nelos.parallel.pipeline.runner.service.RunnerContext
+import com.nelos.parallel.pipeline.runner.service.RunnerManager
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.ApplicationEventPublisher
+import org.springframework.context.annotation.Lazy
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
@@ -41,32 +48,44 @@ class PipelineServiceImpl(
     private val submissionLogger: SubmissionLogger,
     private val jobService: JobService,
     private val studentResolver: StudentResolver,
-    private val runnerSelector: RunnerSelector,
+    private val runnerManager: RunnerManager,
     private val resultEvaluator: SubmissionResultEvaluator,
     private val resultLogFormatter: SubmissionResultLogFormatter,
     private val objectMapper: ObjectMapper,
     @param:Value("\${gitlab.api.token:}") private val gitlabApiToken: String,
     @param:Value("\${gitlab.server.base-url:}") private val serverBaseUrl: String,
+    private val applicationEventPublisher: ApplicationEventPublisher,
     transactionManager: PlatformTransactionManager,
 ) : PipelineService {
 
     private val txTemplate = TransactionTemplate(transactionManager)
 
+    /**
+     * Spring proxy reference to self. Needed so that `submit()` can wire
+     * `onResult = self::handleResult` for the runner callbacks - calling
+     * `this::handleResult` directly bypasses AOP, which would skip the
+     * `@Transactional` on `handleResult` when a sync runner (local/docker)
+     * fires the callback from its background pool. `@Lazy` breaks the
+     * self-injection cycle at startup.
+     */
+    @Autowired
+    @Lazy
+    private lateinit var self: PipelineService
+
     // --- Submit ----------------------------------------------------------
 
     /**
      * Submission is split into discrete phases so the slow network calls
-     * ([RunnerSelector] HTTP health-check + adapter submitTask AMQP RPC, up
-     * to ~30s) do NOT happen inside the DB transaction - keeping a Hikari
-     * connection open during a remote RPC would saturate the small pool
-     * under concurrent CI submits.
+     * (HTTP health-check + AMQP submitTask RPC, up to ~30s) and the process
+     * spawn for local/docker runners do NOT happen inside the DB transaction -
+     * keeping a Hikari connection open during a remote RPC or a process spawn
+     * would saturate the small pool under concurrent CI submits.
      *
      *   txTemplate { prepareSubmission }   - DB writes + pessimistic lock to
      *                                        reject any prior pending row for
      *                                        the same MR.
-     *   runnerSelector.selectRunner        - outside tx; HTTP health-check.
      *   txTemplate { markDispatched }      - DB write only.
-     *   adapter.submitTask                 - outside tx; AMQP RPC.
+     *   runnerManager.dispatch             - outside tx; runner-specific work.
      *   txTemplate { failSubmission }      - DB write only, on any failure.
      */
     override fun submit(request: PipelineSubmitRequest): PipelineSubmitResponse {
@@ -79,29 +98,37 @@ class PipelineServiceImpl(
         } ?: error("prepareSubmission returned null")
 
         // Failure-mode policy:
-        //   - Pre-dispatch failures (selectRunner / markDispatched) -> `failSubmissionTx`:
-        //     we never reached the engine, no async result is coming.
-        //   - submitTask RPC failures AFTER markDispatched -> leave DISPATCHED.
-        //     The RPC sees the acceptance ack, not the result. A timed-out ack
-        //     does NOT mean the engine rejected the job - broker might have
-        //     delivered the task to the engine before our timeout fired, and
-        //     the engine will then callback with a real result. Marking ERROR
-        //     here would discard that real result on arrival (handleResult's
+        //   - NoRunnerAvailableException (every runner declined) -> `failSubmissionTx`:
+        //     no runner accepted the task, no async result is coming.
+        //   - Async runners (HTTP/Rabbit) swallow RPC failures inside `tryRun`
+        //     and return a handle anyway - the broker may have delivered the
+        //     task to the engine before our timeout fired, and the engine
+        //     will then callback with a real result. Marking ERROR here
+        //     would discard that real result on arrival (handleResult's
         //     terminal-status guard would drop it). StuckSubmissionCleanupJob
         //     handles the genuine "engine never came back" case.
         return try {
-            val runner = runnerSelector.selectRunner(ctx.submissionId)
-                ?: return failSubmissionTx(ctx, "No engine nodes available")
-            LOG.info("Dispatching to node '{}' via {}", runner.node.nodeId, runner.transport)
+            txTemplate.executeWithoutResult { markDispatched(ctx.submissionId) }
+            val runnerCtx = RunnerContext(
+                submissionId = ctx.submissionId,
+                task = buildTask(inputs, ctx.submissionId),
+                onResult = self::handleResult,
+            )
+            val handle = runnerManager.dispatch(runnerCtx)
             bestEffortLog(
                 ctx.submissionId,
-                "[parallel] Dispatching to engine node '${runner.node.nodeId}' via ${runner.transport}..."
+                "[parallel] Dispatched via runner '${handle.runnerName}' (job=${ctx.jobId})"
             )
-            dispatchAndAck(ctx, runner, buildTask(inputs, ctx.submissionId))
+            LOG.info(
+                "Pipeline submission id={} dispatched via runner {}",
+                ctx.submissionId, handle.runnerName,
+            )
             PipelineSubmitResponse(submissionId = ctx.submissionId, status = "dispatched")
+        } catch (e: NoRunnerAvailableException) {
+            failSubmissionTx(ctx, "No runner accepted the task: ${e.message ?: "no runners"}")
         } catch (e: Exception) {
-            // selectRunner / markDispatched (or earlier) blew up. We never got to submitTask
-            // -> safe to mark ERROR, no late callback is possible.
+            // markDispatched / unexpected runner failure - safe to mark ERROR,
+            // no late callback is possible.
             failSubmissionTx(ctx, "Dispatch failed: ${e.message ?: e::class.simpleName ?: "unknown"}")
         }
     }
@@ -171,35 +198,8 @@ class PipelineServiceImpl(
         wallTimeSec = inputs.assignment.wallTimeSec,
         cpuTimeSec = inputs.assignment.cpuTimeSec,
         maxProcesses = inputs.assignment.maxProcesses,
+        warmupIterations = inputs.assignment.warmupIterations,
     )
-
-    /**
-     * Flips the submission to DISPATCHED and fires the engine RPC. RPC
-     * acceptance-ack timeout does NOT fail the submission - the engine may
-     * still have received the task and will eventually callback with a real
-     * result. Stuck-cleanup picks up the genuine "engine never came back"
-     * case after 30 minutes.
-     */
-    private fun dispatchAndAck(ctx: SubmissionContext, runner: SelectedRunner, task: TaskSubmission) {
-        txTemplate.executeWithoutResult { markDispatched(ctx.submissionId) }
-        try {
-            runner.adapter.submitTask(runner.node, task)
-            bestEffortLog(ctx.submissionId, "[parallel] Task dispatched (job=${ctx.jobId})")
-            LOG.info("Pipeline submission id={} dispatched to node {}", ctx.submissionId, runner.node.nodeId)
-        } catch (rpcEx: Exception) {
-            LOG.warn(
-                "Submit RPC to node '{}' failed for submission {} - leaving DISPATCHED so a late " +
-                        "engine callback can still be applied: {}",
-                runner.node.nodeId, ctx.submissionId, rpcEx.message,
-            )
-            bestEffortLog(
-                ctx.submissionId,
-                "[parallel] Submit RPC to '${runner.node.nodeId}' failed: ${rpcEx.message ?: rpcEx::class.simpleName}. " +
-                        "If the engine still received the task, the real result will follow; otherwise " +
-                        "stuck-submission cleanup will fail this submission.",
-            )
-        }
-    }
 
     /** Bundle of CI-request fields validated against the matching assignment. */
     private data class ResolvedInputs(
@@ -433,6 +433,16 @@ class PipelineServiceImpl(
 
         // Persist the full result (idempotent upsert by submissionId)
         persistSubmissionResult(submissionId, finalLines, result)
+
+        // Best-effort: never let a stray listener exception roll back the
+        // submission's terminal status. Production registers no listener so
+        // this is a no-op except in tests.
+        runCatching {
+            applicationEventPublisher.publishEvent(
+                SubmissionTerminalEvent(submissionId, submission.status!!)
+            )
+        }.onFailure { LOG.warn("SubmissionTerminalEvent publish failed for submission {}: {}", submissionId, it.message) }
+
         LOG.info("Pipeline result for submission {}: {}", submissionId, result.status)
     }
 

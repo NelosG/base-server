@@ -11,29 +11,10 @@
 
     <name>Parallel Server Adapters HTTP</name>
     <artifactId>parallel-server-adapters-http</artifactId>
-    <packaging>jar</packaging>
+    <packaging>pom</packaging>
 
-    <dependencies>
-        <dependency>
-            <groupId>nelos.parallel</groupId>
-            <artifactId>parallel-server-core-adapters</artifactId>
-            <version>${parallel-server.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>nelos.parallel</groupId>
-            <artifactId>parallel-server-pipeline-commons</artifactId>
-            <version>${parallel-server.version}</version>
-        </dependency>
-
-        <!-- SPRING -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-    </dependencies>
+    <modules>
+        <module>core</module>
+        <module>forms</module>
+    </modules>
 </project>

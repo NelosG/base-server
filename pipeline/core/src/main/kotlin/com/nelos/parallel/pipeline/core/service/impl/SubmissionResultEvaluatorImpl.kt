@@ -60,10 +60,11 @@ class SubmissionResultEvaluatorImpl(
     /** Status-and-summary derived from the engine's TaskResult alone. */
     private fun baseline(result: TaskResult): SubmissionVerdict {
         val testsFailed = hasFailedTests(result)
+        val submissionStatus = submissionStatusOf(result, testsFailed)
         return SubmissionVerdict(
-            submissionStatus = submissionStatusOf(result, testsFailed),
+            submissionStatus = submissionStatus,
             jobStatus = jobStatusOf(result, testsFailed),
-            summary = summarize(result),
+            summary = summarize(result, submissionStatus),
         )
     }
 
@@ -90,8 +91,11 @@ class SubmissionResultEvaluatorImpl(
         return corrFailed + perfFailed > 0
     }
 
-    private fun summarize(result: TaskResult): String = buildString {
-        append("Status: ${result.status}")
+    // `status` is the verdict's SubmissionStatus, not the raw engine status -
+    // a TaskResult with `status="completed"` but a few failed perf tests is
+    // a FAILED submission, and the leading "Status:" must reflect that.
+    private fun summarize(result: TaskResult, status: SubmissionStatus): String = buildString {
+        append("Status: ${status.name.lowercase()}")
         result.durationMs?.let { append(", Duration: ${it}ms") }
         result.error?.let { append(", Error: $it") }
         result.summary?.let { s ->

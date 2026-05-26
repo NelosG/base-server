@@ -24,5 +24,10 @@
             <artifactId>parallel-server-pipeline-data</artifactId>
             <version>${parallel-server.version}</version>
         </dependency>
+        <dependency>
+            <groupId>nelos.parallel</groupId>
+            <artifactId>parallel-server-pipeline-runner</artifactId>
+            <version>${parallel-server.version}</version>
+        </dependency>
     </dependencies>
 </project>

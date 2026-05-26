@@ -27,4 +27,5 @@ class TaskSubmission @JsonCreator constructor(
     @param:JsonProperty("wallTimeSec") val wallTimeSec: Int? = null,
     @param:JsonProperty("cpuTimeSec") val cpuTimeSec: Int? = null,
     @param:JsonProperty("maxProcesses") val maxProcesses: Int? = null,
+    @param:JsonProperty("warmupIterations") val warmupIterations: Int? = null,
 )

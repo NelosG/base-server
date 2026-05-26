@@ -15,6 +15,9 @@ function esc(s) {
     return d.innerHTML;
 }
 
+// Search wiring is declarative now (data-prl-list-filter on the input);
+// see Prl.attachListFilter in prl-utils.js. We just need to kick off the
+// initial data load.
 document.addEventListener("DOMContentLoaded", function () {
     loadAssignments();
 });
@@ -47,7 +50,14 @@ function renderAssignmentList(assignments) {
         var item = document.createElement("div");
         item.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center assignment-item";
         item.style.cursor = "pointer";
-        item.setAttribute("data-assignment-name", (a.code || "").toLowerCase());
+        // Pre-built search haystack: all fields the user might type, lower-cased,
+        // joined by space. Avoids relying on textContent (which also picks up
+        // badge labels like "Active") and survives DOM reflow during filter.
+        var testName = (a.testRepoUrl || "").replace(/.*\//, "").replace(/\.git$/, "");
+        var haystack = [
+            a.code, a.name, a.gitlabProjectPath, testName, a.testRepoBranch,
+        ].filter(Boolean).join(" ").toLowerCase();
+        item.setAttribute("data-search", haystack);
 
         var infoDiv = document.createElement("div");
         var strong = document.createElement("strong");
@@ -65,27 +75,29 @@ function renderAssignmentList(assignments) {
         infoDiv.appendChild(br);
         var small = document.createElement("small");
         small.className = "text-muted";
-        var testName = (a.testRepoUrl || "").replace(/.*\//, "").replace(/\.git$/, "");
         small.textContent = (a.gitlabProjectPath || "") + (testName ? " | tests: " + testName : "") + " @ " + (a.testRepoBranch || "main");
         infoDiv.appendChild(small);
 
-        // Click opens detail inline
+        // Click on the row toggles the settings (edit) form. Forks live on
+        // their own button - keeps the most common action (review/edit the
+        // assignment) on the whole-row hit target.
         item.addEventListener("click", function (e) {
             if (e.target.closest("button")) return;
-            toggleDetail(a.id, item);
+            if (editingAssignmentId === a.id) hideForm();
+            else editAssignment(a.id, item);
         });
 
         // Action buttons
         var btnGroup = document.createElement("div");
         btnGroup.className = "btn-group btn-group-sm";
 
-        var editBtn = document.createElement("button");
-        editBtn.className = "btn btn-outline-primary";
-        editBtn.title = "Edit parameters";
-        editBtn.appendChild(Prl.el("i", {className: "bi bi-pencil"}));
-        editBtn.addEventListener("click", function (e) {
+        var forksBtn = document.createElement("button");
+        forksBtn.className = "btn btn-outline-primary";
+        forksBtn.title = "Manage forks";
+        forksBtn.appendChild(Prl.el("i", {className: "bi bi-diagram-3"}));
+        forksBtn.addEventListener("click", function (e) {
             e.stopPropagation();
-            editAssignment(a.id, item);
+            toggleDetail(a.id, item);
         });
 
         var toggleBtn = document.createElement("button");
@@ -96,7 +108,10 @@ function renderAssignmentList(assignments) {
         toggleBtn.appendChild(toggleIcon);
         toggleBtn.addEventListener("click", function (e) {
             e.stopPropagation();
-            ViewEngine.call(SERVICE, "saveAssignment", [{id: a.id, active: a.active === false}]).then(function () {
+            // Dedicated partial endpoint so flipping Active doesn't have to
+            // re-send the whole assignment - the full saveAssignment is a PUT
+            // and would null any field absent from the payload.
+            ViewEngine.call(SERVICE, "setAssignmentActive", [a.id, a.active === false]).then(function () {
                 loadAssignments();
             });
         });
@@ -112,7 +127,7 @@ function renderAssignmentList(assignments) {
         deleteIcon.className = "bi bi-trash";
         deleteBtn.appendChild(deleteIcon);
 
-        btnGroup.appendChild(editBtn);
+        btnGroup.appendChild(forksBtn);
         btnGroup.appendChild(toggleBtn);
         btnGroup.appendChild(deleteBtn);
 
@@ -121,15 +136,9 @@ function renderAssignmentList(assignments) {
         list.appendChild(item);
     });
     container.appendChild(list);
-}
-
-function filterAssignments(query) {
-    var q = (query || "").toLowerCase();
-    var items = document.getElementById("assignment-list").querySelectorAll(".assignment-item");
-    items.forEach(function (item) {
-        var text = item.textContent.toLowerCase();
-        item.style.display = (!q || text.indexOf(q) !== -1) ? "" : "none";
-    });
+    // Re-apply any active text filter to freshly-rendered rows so a search
+    // typed before the fetch settled keeps hiding the right set.
+    Prl.reapplyListFilters();
 }
 
 // --- Project Typeahead Search ----------------------------------------
@@ -227,8 +236,19 @@ function attachProjectSearch(inputEl, resultsEl, onSelect) {
         timer = setTimeout(fetchSearch, SEARCH_DEBOUNCE_MS);
     });
     inputEl.addEventListener("focus", function () {
+        // Don't re-fetch when the value still matches the last pick: the user
+        // is just tabbing through the form, not asking for a new search.
+        if (inputEl.value === inputEl.getAttribute("data-selected-path")) return;
         if (timer) clearTimeout(timer);
         timer = setTimeout(fetchSearch, SEARCH_DEBOUNCE_MS / 2);
+    });
+    // After a pick the input keeps focus but the dropdown was closed.
+    // A second click on the already-focused input wouldn't fire `focus`,
+    // so handle `click` directly to re-open with a fresh fetch.
+    inputEl.addEventListener("click", function () {
+        if (resultsEl.style.display !== "none") return;
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(fetchSearch, 0);
     });
     inputEl.addEventListener("keydown", function (e) {
         if (resultsEl.style.display === "none" || currentResults.length === 0) return;
@@ -322,6 +342,7 @@ function buildAssignmentForm(title, a) {
     var wallVal = esc(a.wallTimeSec);
     var cpuVal = esc(a.cpuTimeSec);
     var procVal = esc(a.maxProcesses);
+    var warmupVal = esc(a.warmupIterations);
 
     card.innerHTML =
         '<div class="card-header d-flex justify-content-between">' +
@@ -336,11 +357,11 @@ function buildAssignmentForm(title, a) {
         '<input type="hidden" class="form-code" value="' + codeVal + '">' +
         '<input type="hidden" class="form-name" value="' + nameVal + '">' +
         '<div class="row">' +
-        '<div class="col-md-6 mb-3 position-relative"><label class="form-label">Solution Project</label>' +
+        '<div class="col-md-6 mb-3 position-relative"><label class="form-label required">Solution Project</label>' +
         '<input class="form-control project-search" type="text" placeholder="Type to search projects..." autocomplete="off" value="' + pathVal + '">' +
         '<div class="dropdown-menu w-100 project-results" style="max-height:280px;overflow-y:auto;"></div>' +
         '</div>' +
-        '<div class="col-md-6 mb-3 position-relative"><label class="form-label">Test Project</label>' +
+        '<div class="col-md-6 mb-3 position-relative"><label class="form-label required">Test Project</label>' +
         '<input class="form-control test-project-search" type="text" placeholder="Type to search projects..." autocomplete="off">' +
         '<div class="dropdown-menu w-100 test-project-results" style="max-height:280px;overflow-y:auto;"></div>' +
         '</div>' +
@@ -348,7 +369,7 @@ function buildAssignmentForm(title, a) {
         '<div class="mb-3"><label class="form-label">Description</label>' +
         '<textarea class="form-control form-description" rows="2">' + descVal + '</textarea></div>' +
         '<div class="row">' +
-        '<div class="col-md-6 mb-3"><label class="form-label">Test Branch</label>' +
+        '<div class="col-md-6 mb-3"><label class="form-label required">Test Branch</label>' +
         '<select class="form-select branch-select"><option>Select test project</option></select></div>' +
         '<div class="col-md-3 mb-3"><label class="form-label">Memory (MB)</label>' +
         '<input class="form-control form-memoryLimitMb" type="number" placeholder="1024" value="' + memVal + '"></div>' +
@@ -356,12 +377,14 @@ function buildAssignmentForm(title, a) {
         '<input class="form-control form-threads" type="number" placeholder="4" value="' + threadVal + '"></div>' +
         '</div>' +
         '<div class="row">' +
-        '<div class="col-md-4 mb-3"><label class="form-label">Wall (s)</label>' +
+        '<div class="col-md-3 mb-3"><label class="form-label">Wall (s)</label>' +
         '<input class="form-control form-wallTimeSec" type="number" placeholder="60" value="' + wallVal + '"></div>' +
-        '<div class="col-md-4 mb-3"><label class="form-label">CPU (s)</label>' +
+        '<div class="col-md-3 mb-3"><label class="form-label">CPU (s)</label>' +
         '<input class="form-control form-cpuTimeSec" type="number" placeholder="30" value="' + cpuVal + '"></div>' +
-        '<div class="col-md-4 mb-3"><label class="form-label">Max Processes</label>' +
+        '<div class="col-md-3 mb-3"><label class="form-label">Max Processes</label>' +
         '<input class="form-control form-maxProcesses" type="number" placeholder="threads x multiplier" value="' + procVal + '"></div>' +
+        '<div class="col-md-3 mb-3"><label class="form-label">Warmup Iterations</label>' +
+        '<input class="form-control form-warmupIterations" type="number" min="0" placeholder="0" value="' + warmupVal + '"></div>' +
         '</div>' +
         '<div class="mb-3 form-check">' +
         '<input class="form-check-input form-active" type="checkbox"' + (a.active !== false ? ' checked' : '') + '>' +
@@ -442,6 +465,15 @@ function buildAssignmentForm(title, a) {
     });
 
     initScriptEditor(card, a && a.evaluatorScript);
+
+    // Pre-fill solution project marker: in an edit form the input already
+    // shows the saved value. Without data-selected-path, focusing the input
+    // would fire a search for that exact path and the dropdown would say
+    // "No matching projects" before the user touched anything.
+    if (a.gitlabProjectPath) {
+        var solutionInput = body.querySelector(".project-search");
+        solutionInput.setAttribute("data-selected-path", a.gitlabProjectPath);
+    }
 
     // Pre-fill test project text + branches for existing assignment
     if (a.testRepoUrl) {
@@ -543,28 +575,44 @@ function saveAssignment(formEl) {
     var wallVal = body.querySelector(".form-wallTimeSec").value;
     var cpuVal = body.querySelector(".form-cpuTimeSec").value;
     var procVal = body.querySelector(".form-maxProcesses").value;
-    var scriptPayload = collectScriptPayload(formEl);
+    var warmupVal = body.querySelector(".form-warmupIterations").value;
+    var gitlabProjectPath = body.querySelector(".form-gitlabProjectPath").value;
+    var testRepoUrl = body.querySelector(".form-testRepoUrl").value;
+    var branchSelect = body.querySelector(".branch-select");
+    var testRepoBranch = branchSelect.value;
+    var code = body.querySelector(".form-code").value;
+    var name = body.querySelector(".form-name").value;
+    // Required-field validation. The server is strict (PUT semantics, non-
+    // null types in the request), but UI feedback is friendlier than a 500.
+    if (!gitlabProjectPath) {
+        Prl.alert("#main-alert", "warning", "Select a solution project.");
+        return;
+    }
+    if (!testRepoUrl) {
+        Prl.alert("#main-alert", "warning", "Select a test project.");
+        return;
+    }
+    if (!testRepoBranch || branchSelect.querySelector("option[value='" + testRepoBranch + "']") === null) {
+        Prl.alert("#main-alert", "warning", "Select a test branch.");
+        return;
+    }
     var data = {
         id: idVal ? parseInt(idVal) : null,
-        code: body.querySelector(".form-code").value,
-        name: body.querySelector(".form-name").value,
-        description: body.querySelector(".form-description").value,
-        gitlabProjectPath: body.querySelector(".form-gitlabProjectPath").value || null,
-        testRepoUrl: body.querySelector(".form-testRepoUrl").value,
-        testRepoBranch: body.querySelector(".branch-select").value,
+        code: code,
+        name: name,
+        description: body.querySelector(".form-description").value || null,
+        gitlabProjectPath: gitlabProjectPath,
+        testRepoUrl: testRepoUrl,
+        testRepoBranch: testRepoBranch,
         memoryLimitMb: memVal ? parseInt(memVal) : null,
         threads: thrVal ? parseInt(thrVal) : null,
         wallTimeSec: wallVal ? parseInt(wallVal) : null,
         cpuTimeSec: cpuVal ? parseInt(cpuVal) : null,
         maxProcesses: procVal ? parseInt(procVal) : null,
+        warmupIterations: warmupVal ? parseInt(warmupVal) : null,
         active: body.querySelector(".form-active").checked,
-        evaluatorScript: scriptPayload.evaluatorScript,
-        clearEvaluatorScript: scriptPayload.clearEvaluatorScript
+        evaluatorScript: collectScriptPayload(formEl)
     };
-    if (!data.gitlabProjectPath) {
-        Prl.alert("#main-alert", "warning", "Select a solution project.");
-        return;
-    }
     ViewEngine.call(SERVICE, "saveAssignment", [data]).then(function () {
         hideForm();
         Prl.alert("#main-alert", "success", "Assignment saved.");
@@ -916,26 +964,21 @@ function ensureMonaco() {
 
 var SCRIPT_TEMPLATES = {
     KTS: [
-        "import com.nelos.parallel.pipeline.kts.api.judge",
-        "import com.nelos.parallel.pipeline.kts.api.pass",
-        "import com.nelos.parallel.pipeline.kts.api.fail",
-        "import com.nelos.parallel.pipeline.kts.api.followBaseline",
+        "// ctx (JudgeContext) is provided automatically. Helpers pass(),",
+        "// fail(), ctx.followBaseline() and the engine VOs (TaskResult,",
+        "// TestSummary, ...) are auto-imported. The script's LAST expression",
+        "// is the verdict.",
         "",
-        "// Available: ctx.result (TaskResult), ctx.baseline (default verdict)",
-        "// Helpers: pass(summary, reason), fail(reason, summary), followBaseline(reason)",
-        "// See the JudgeContext schema on the right.",
-        "",
-        "judge { ctx ->",
-        "    val perf = ctx.result.summary?.performance",
-        "    val passed = perf?.passed",
-        "    val total = perf?.totalTests",
-        "    if (passed == null || total == null || total == 0) {",
-        "        followBaseline(\"No performance data\")",
-        "    } else if (passed.toDouble() / total >= 0.7) {",
+        "val perf = ctx.result.summary?.performance",
+        "val passed = perf?.passed",
+        "val total = perf?.totalTests",
+        "when {",
+        "    passed == null || total == null || total == 0 ->",
+        "        ctx.followBaseline(\"No performance data\")",
+        "    passed.toDouble() / total >= 0.7 ->",
         "        pass(summary = \"perf rate $passed/$total\")",
-        "    } else {",
+        "    else ->",
         "        fail(reason = \"Need 70% perf pass rate, got $passed/$total\")",
-        "    }",
         "}",
         ""
     ].join("\n"),
@@ -1065,28 +1108,26 @@ function initScriptEditor(formCard, existingScript) {
     syncVisibility();
 }
 
-// Pulls the script payload out of the form for save. Returns either:
-//   { evaluatorScript: { type, source } } - instructor wants this script attached
-//   { clearEvaluatorScript: true }        - instructor switched dropdown to NONE
-//   {}                                    - script section never rendered (legacy form)
+// Pulls the script payload out of the form for save. Returns the
+// EvaluatorScript JSON object when the instructor wants a script attached,
+// or null when they switched the dropdown to NONE / left the body empty -
+// under PUT semantics, null on the wire clears any existing script.
 function collectScriptPayload(formCard) {
     var section = formCard.querySelector(".script-section");
-    if (!section) return {};
+    if (!section) return null;
     var type = section.querySelector(".script-type").value;
-    if (type === "NONE") return {clearEvaluatorScript: true};
+    if (type === "NONE") return null;
     var editor = formCard._scriptEditor;
     var source = editor ? editor.getValue() : (SCRIPT_TEMPLATES[type] || "");
-    if (!source.trim()) return {clearEvaluatorScript: true};
+    if (!source.trim()) return null;
     var enabledEl = section.querySelector(".script-enabled");
     var timeoutEl = section.querySelector(".script-timeout");
     var timeoutMs = parseInt(timeoutEl && timeoutEl.value, 10);
     if (!timeoutMs || timeoutMs <= 0) timeoutMs = 5000;
     return {
-        evaluatorScript: {
-            type: type,
-            source: source,
-            enabled: !enabledEl || enabledEl.checked,
-            timeoutMs: timeoutMs
-        }
+        type: type,
+        source: source,
+        enabled: !enabledEl || enabledEl.checked,
+        timeoutMs: timeoutMs
     };
 }

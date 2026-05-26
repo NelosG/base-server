@@ -29,12 +29,24 @@
 
             <div class="card mb-3">
                 <div class="card-body">
-                    <label class="form-label" for="group-filter">Group</label>
-                    <select class="form-select" data-prl-options="prl.studentGroupViewService.getGroups"
-                            id="group-filter">
-                        <option value="">All students</option>
-                        <option value="-1">- Without group -</option>
-                    </select>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label" for="group-filter">Group</label>
+                            <input class="form-control" id="group-filter" type="text"
+                                   data-prl-search-select="prl.studentGroupViewService.getGroups"
+                                   data-prl-value="id"
+                                   data-prl-label="name"
+                                   data-prl-all-label="All students"
+                                   data-prl-extra='[{"value":-1,"label":"- Without group -"}]'
+                                   placeholder="Type to search groups...">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="name-search">Search</label>
+                            <input class="form-control" id="name-search" type="text"
+                                   data-prl-list-filter="#students-table tbody tr"
+                                   placeholder="Filter by login / display name / gitlab...">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -43,7 +55,7 @@
                     <h5 class="card-title">Create student</h5>
                     <div class="alert d-none" id="create-alert"></div>
                     <div class="mb-3">
-                        <label class="form-label" for="new-login">Login *</label>
+                        <label class="form-label required" for="new-login">Login</label>
                         <input class="form-control" id="new-login" type="text">
                     </div>
                     <div class="mb-3">
@@ -56,10 +68,12 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label" for="new-group-id">Group (optional)</label>
-                        <select class="form-select" data-prl-options="prl.studentGroupViewService.getGroups"
-                                id="new-group-id">
-                            <option value="">- None -</option>
-                        </select>
+                        <input class="form-control" id="new-group-id" type="text"
+                               data-prl-search-select="prl.studentGroupViewService.getGroups"
+                               data-prl-value="id"
+                               data-prl-label="name"
+                               data-prl-all-label="- None -"
+                               placeholder="Type to search groups...">
                     </div>
                     <button class="btn btn-success"
                             data-prl-alert="#create-alert"
@@ -90,7 +104,8 @@
                                data-prl-empty="#empty"
                                data-prl-list="prl.studentViewService.getStudents"
                                data-prl-reload-on="#group-filter:change"
-                               data-prl-row="studentRow">
+                               data-prl-row="studentRow"
+                               id="students-table">
                             <thead>
                                 <tr>
                                     <th>Login</th>
@@ -114,7 +129,7 @@
             const SVC = "prl.studentViewService";
 
             function listArgs() {
-                return [Prl.parseLong(Prl.val("#group-filter"))];
+                return [Prl.parseLong(Prl.dataVal("#group-filter"))];
             }
 
             function validateCreate() {
@@ -126,7 +141,7 @@
                     login: Prl.val("#new-login").trim(),
                     displayName: Prl.val("#new-display-name").trim() || null,
                     gitlabName: Prl.val("#new-gitlab-name").trim() || null,
-                    groupId: Prl.parseLong(Prl.val("#new-group-id")),
+                    groupId: Prl.parseLong(Prl.dataVal("#new-group-id")),
                 }];
             }
 
@@ -145,7 +160,12 @@
 
             function studentRow(s) {
                 const tr = document.createElement("tr");
-                tr.appendChild(Prl.td(s.login || ""));
+                // Pre-built haystack for the Search input - intentionally
+                // restricted to login/displayName/gitlab so typing a number
+                // doesn't accidentally hit on the Submissions-count column.
+                const hay = [s.login, s.displayName, s.gitlabName].filter(Boolean).join(" ").toLowerCase();
+                tr.setAttribute("data-search", hay);
+                tr.appendChild(loginCell(s));
                 tr.appendChild(Prl.td(s.displayName || ""));
                 tr.appendChild(Prl.td(s.gitlabName || "-"));
                 tr.appendChild(Prl.td((s.groupNames || []).join(", ") || "-"));
@@ -153,6 +173,14 @@
                 tr.appendChild(passwordCell(s));
                 tr.appendChild(actionsCell(s));
                 return tr;
+            }
+
+            function loginCell(s) {
+                const td = document.createElement("td");
+                td.appendChild(Prl.el("a", {
+                    href: "/student?id=" + s.id, text: s.login || "",
+                }));
+                return td;
             }
 
             function passwordCell(s) {
@@ -171,10 +199,6 @@
 
             function actionsCell(s) {
                 const td = document.createElement("td");
-                td.appendChild(Prl.el("a", {
-                    className: "btn btn-sm btn-outline-secondary me-1",
-                    href: "/student?id=" + s.id, text: "Open",
-                }));
                 td.appendChild(Prl.el("button", {
                     className: "btn btn-sm btn-outline-warning me-1", text: "Reset password",
                     onClick: () => Prl.confirmCall("Reset password for '" + s.login + "'?",
@@ -197,7 +221,7 @@
                 Prl.$("#btn-dismiss-created").addEventListener("click", () => Prl.$("#created-alert").classList.add("d-none"));
                 Prl.$("#btn-export-csv").addEventListener("click", ev => {
                     ev.preventDefault();
-                    const raw = Prl.val("#group-filter");
+                    const raw = Prl.dataVal("#group-filter");
                     window.location.href = "/api/students/export.csv" + (raw === "" ? "" : "?groupId=" + encodeURIComponent(raw));
                 });
             });

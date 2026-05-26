@@ -57,16 +57,16 @@
                         <div class="card-header"><i class="bi bi-shield-lock"></i> Change password</div>
                         <div class="card-body">
                             <div class="alert d-none" id="pw-alert"></div>
-                            <div class="mb-3">
-                                <label class="form-label" for="current-password">Current password</label>
+                            <div class="mb-3" data-prl-hide-if="passwordChangeRequired" id="current-password-row">
+                                <label class="form-label required" for="current-password">Current password</label>
                                 <input class="form-control" id="current-password" type="password">
                             </div>
                             <div class="mb-3">
-                                <label class="form-label" for="new-password">New password</label>
+                                <label class="form-label required" for="new-password">New password</label>
                                 <input class="form-control" id="new-password" type="password">
                             </div>
                             <div class="mb-3">
-                                <label class="form-label" for="confirm-password">Confirm new password</label>
+                                <label class="form-label required" for="confirm-password">Confirm new password</label>
                                 <input class="form-control" id="confirm-password" type="password">
                             </div>
                             <button class="btn btn-primary"
@@ -96,15 +96,26 @@
                 return Prl.val("#display-name-input").trim() ? null : "Display name must not be empty";
             }
 
+            function isOtp() {
+                // The Current-password row is hidden via data-prl-hide-if when the
+                // user is in OTP (forced-change) mode - mirror that here so the
+                // payload and validation don't ask for what we just hid.
+                const row = document.getElementById("current-password-row");
+                return !!row && row.classList.contains("d-none");
+            }
+
             function passwordArgs() {
-                return [{currentPassword: Prl.val("#current-password"), newPassword: Prl.val("#new-password")}];
+                return [{
+                    currentPassword: isOtp() ? null : Prl.val("#current-password"),
+                    newPassword: Prl.val("#new-password"),
+                }];
             }
 
             function validatePassword() {
-                const cur = Prl.val("#current-password");
                 const next = Prl.val("#new-password");
                 const confirm = Prl.val("#confirm-password");
-                if (!cur || !next) return "All fields are required";
+                if (!next) return "New password is required";
+                if (!isOtp() && !Prl.val("#current-password")) return "Current password is required";
                 if (next !== confirm) return "New password and confirmation do not match";
                 if (next.length < 8) return "New password must be at least 8 characters long";
                 return null;

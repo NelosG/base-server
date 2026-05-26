@@ -47,8 +47,8 @@ class StudentGroupViewService(
     @Transactional
     fun saveGroup(data: SaveStudentGroupRequest): StudentGroupView {
         val group = data.id?.let { groupService.findById(it) } ?: StudentGroup()
-        group.name = data.name ?: group.name
-        group.description = data.description ?: group.description
+        group.name = data.name
+        group.description = data.description
         val saved = groupService.save(group)
         val savedId = saved.id ?: error("Group has no id after save")
 

@@ -45,27 +45,33 @@ class AssignmentViewService(
             Assignment()
         }
 
-        assignment.code = data.code ?: assignment.code
-        assignment.name = data.name ?: assignment.name
-        assignment.description = data.description ?: assignment.description
-        assignment.gitlabProjectPath = data.gitlabProjectPath ?: assignment.gitlabProjectPath
-        assignment.testRepoUrl = data.testRepoUrl ?: assignment.testRepoUrl
-        assignment.testRepoBranch = data.testRepoBranch ?: assignment.testRepoBranch
-        assignment.memoryLimitMb = data.memoryLimitMb ?: assignment.memoryLimitMb
-        assignment.threads = data.threads ?: assignment.threads
-        assignment.wallTimeSec = data.wallTimeSec ?: assignment.wallTimeSec
-        assignment.cpuTimeSec = data.cpuTimeSec ?: assignment.cpuTimeSec
-        assignment.maxProcesses = data.maxProcesses ?: assignment.maxProcesses
-        data.active?.let { assignment.active = it }
-        // Verdict script: explicit clear takes priority (instructor removed the
-        // script); otherwise a non-null payload replaces the existing one, and
-        // a null payload leaves the current script untouched (partial update).
-        if (data.clearEvaluatorScript == true) {
-            assignment.evaluatorScript = null
-        } else if (data.evaluatorScript != null) {
-            assignment.evaluatorScript = data.evaluatorScript
-        }
+        assignment.code = data.code
+        assignment.name = data.name
+        assignment.description = data.description
+        assignment.gitlabProjectPath = data.gitlabProjectPath
+        assignment.testRepoUrl = data.testRepoUrl
+        assignment.testRepoBranch = data.testRepoBranch
+        assignment.memoryLimitMb = data.memoryLimitMb
+        assignment.threads = data.threads
+        assignment.wallTimeSec = data.wallTimeSec
+        assignment.cpuTimeSec = data.cpuTimeSec
+        assignment.maxProcesses = data.maxProcesses
+        assignment.warmupIterations = data.warmupIterations
+        assignment.active = data.active
+        assignment.evaluatorScript = data.evaluatorScript
 
+        return assignmentService.save(assignment).toView()
+    }
+
+    /**
+     * Toggles only the active flag without re-sending the full payload. The
+     * list-page Activate/Deactivate button uses this so flipping one boolean
+     * doesn't accidentally null out resource-limit fields on the way through
+     * the PUT-style `saveAssignment`.
+     */
+    fun setAssignmentActive(id: Long, active: Boolean): AssignmentView {
+        val assignment = assignmentService.findById(id)
+        assignment.active = active
         return assignmentService.save(assignment).toView()
     }
 
@@ -76,8 +82,19 @@ class AssignmentViewService(
     // --- GitLab Project & Branch Selection ---
 
     fun getGitLabProjects(search: String?): List<GitLabProjectView> {
-        return gitLabApiClient.listProjects(search)
+        // GitLab's ?search= filter matches the project NAME only - so "root"
+        // (a namespace) or "root/lab1-openmp" (full path) both return zero
+        // hits server-side. We fetch all candidates and filter against
+        // pathWithNamespace + name ourselves so typing any visible substring
+        // works the way users expect.
+        val q = search?.trim()?.takeIf { it.isNotBlank() }?.lowercase()
+        return gitLabApiClient.listProjects(null)
             .filter { it.forkedFromProject == null && it.markedForDeletionAt == null }
+            .filter {
+                q == null ||
+                    it.pathWithNamespace?.lowercase()?.contains(q) == true ||
+                    it.name?.lowercase()?.contains(q) == true
+            }
             .map {
                 GitLabProjectView(
                     name = it.name,
@@ -200,6 +217,7 @@ class AssignmentViewService(
         wallTimeSec = wallTimeSec,
         cpuTimeSec = cpuTimeSec,
         maxProcesses = maxProcesses,
+        warmupIterations = warmupIterations,
         active = active,
         evaluatorScript = evaluatorScript,
     )

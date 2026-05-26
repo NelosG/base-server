@@ -1,6 +1,12 @@
 document.addEventListener("DOMContentLoaded", function () {
     var path = window.location.pathname;
 
+    // Each link can require:
+    //   - role:    one of the user's ROLE_* roles (ADMIN / STUDENT / USER)
+    //   - feature: a feature-flag token returned by UserViewService.getUserInfo,
+    //              present only when the backing module is on the classpath.
+    //              The HTTP / AMQP adapter pages live in optional jars, so we
+    //              hide them entirely when the jar isn't there.
     var links = [
         {href: "/admin", label: "Admin", icon: "bi-shield-lock", role: "ADMIN"},
         {href: "/api-keys", label: "API Keys", icon: "bi-key", role: "ADMIN"},
@@ -8,8 +14,9 @@ document.addEventListener("DOMContentLoaded", function () {
         {href: "/student-groups", label: "Groups", icon: "bi-people", role: "ADMIN"},
         {href: "/assignments", label: "Assignments", icon: "bi-card-checklist", role: "ADMIN"},
         {href: "/submissions", label: "Submissions", icon: "bi-cloud-upload", role: "ADMIN"},
-        {href: "/adapter-http-test", label: "HTTP Test", icon: "bi-globe", role: "ADMIN"},
-        {href: "/adapter-rabbit-test", label: "AMQP Test", icon: "bi-envelope", role: "ADMIN"},
+        {href: "/runners", label: "Runners", icon: "bi-cpu", role: "ADMIN"},
+        {href: "/adapter-http", label: "HTTP Config", icon: "bi-globe", role: "ADMIN", feature: "adapter-http-forms"},
+        {href: "/adapter-rabbit", label: "AMQP Config", icon: "bi-envelope", role: "ADMIN", feature: "adapter-rabbit-forms"},
         {href: "/my-submissions", label: "My submissions", icon: "bi-cloud-upload", role: "STUDENT"},
     ];
 
@@ -53,9 +60,10 @@ document.addEventListener("DOMContentLoaded", function () {
     links.forEach(function (link) {
         var li = document.createElement("li");
         li.className = "nav-item";
-        if (link.role) {
+        if (link.role || link.feature) {
             li.style.display = "none";
-            li.setAttribute("data-navbar-role", link.role);
+            if (link.role) li.setAttribute("data-navbar-role", link.role);
+            if (link.feature) li.setAttribute("data-navbar-feature", link.feature);
         }
 
         var a = document.createElement("a");
@@ -104,16 +112,26 @@ document.addEventListener("DOMContentLoaded", function () {
     if (typeof ViewEngine !== "undefined") {
         ViewEngine.call("prl.userViewService", "getUserInfo").then(function (data) {
             if (!data) return;
-            if (data.roles) {
-                nav.querySelectorAll("[data-navbar-role]").forEach(function (el) {
-                    var role = el.getAttribute("data-navbar-role");
-                    if (data.roles.indexOf(role) !== -1) {
-                        el.style.display = "";
-                    }
-                });
-            }
+            var roles = data.roles || [];
+            var features = data.features || [];
+            // A link is visible when ALL of its declared constraints pass:
+            // the user has the role (if any) AND the feature is enabled
+            // (if any). Both default to "no constraint".
+            nav.querySelectorAll("[data-navbar-role], [data-navbar-feature]").forEach(function (el) {
+                var reqRole = el.getAttribute("data-navbar-role");
+                var reqFeature = el.getAttribute("data-navbar-feature");
+                var roleOk = !reqRole || roles.indexOf(reqRole) !== -1;
+                var featureOk = !reqFeature || features.indexOf(reqFeature) !== -1;
+                if (roleOk && featureOk) el.style.display = "";
+            });
             var nameEl = nav.querySelector("[data-navbar-display-name]");
             if (nameEl) nameEl.textContent = data.displayName || data.login || "Profile";
+        }).catch(function () {
+            // Session expired between page load and getUserInfo call - the
+            // page itself is still in the user's browser but the cookie
+            // doesn't auth anymore. Send them through /login so they can
+            // pick up a fresh session.
+            window.location.href = "/login?unauthorized=true";
         });
     }
 });

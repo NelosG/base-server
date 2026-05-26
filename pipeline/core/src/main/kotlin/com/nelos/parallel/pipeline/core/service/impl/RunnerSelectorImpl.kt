@@ -31,17 +31,25 @@ class RunnerSelectorImpl(
      *      "engine reachable over Rabbit but never pushed itself into the
      *      registry" case (only the HTTP adapter calls /api/register).
      */
-    override fun selectRunner(submissionId: Long): SelectedRunner? {
-        selectOnce(submissionId)?.let { return it }
+    override fun selectRunner(submissionId: Long): SelectedRunner? = selectInternal(submissionId, null)
+
+    override fun selectRunner(submissionId: Long, transport: TransportType): SelectedRunner? =
+        selectInternal(submissionId, transport)
+
+    private fun selectInternal(submissionId: Long, transport: TransportType?): SelectedRunner? {
+        selectOnce(submissionId, transport)?.let { return it }
         nodeRegistry.invalidateCache()
-        selectOnce(submissionId)?.let { return it }
+        selectOnce(submissionId, transport)?.let { return it }
+        // AMQP discovery applies regardless of the requested transport: an
+        // engine reachable over AMQP only registers itself by responding to
+        // the broadcast. The result is still filtered by `transport` below.
         val discovered = transportManager.discoverAndRefresh(TransportType.AMQP)
         if (discovered.isEmpty()) return null
         bestEffortLog(
             submissionId,
             "[parallel] AMQP discovery picked up ${discovered.size} node(s); retrying dispatch..."
         )
-        return selectOnce(submissionId)
+        return selectOnce(submissionId, transport)
     }
 
     /**
@@ -52,12 +60,13 @@ class RunnerSelectorImpl(
      * transports trivially return the first; point-to-point transports probe
      * each candidate.
      */
-    private fun selectOnce(submissionId: Long): SelectedRunner? {
+    private fun selectOnce(submissionId: Long, transport: TransportType?): SelectedRunner? {
         val nodes = nodeRegistry.findAll()
         if (nodes.isEmpty()) return null
         val nodesByTransport = bucketByTransport(nodes)
 
         for (adapter in adapterRegistry.adaptersInPreferenceOrder) {
+            if (transport != null && adapter.transportType != transport) continue
             val candidates = nodesByTransport[adapter.transportType].orEmpty()
             if (candidates.isEmpty()) continue
             val pick = adapter.pickRunnerNode(candidates)

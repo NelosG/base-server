@@ -25,9 +25,12 @@
                         </div>
                         <div class="card-body">
                             <div class="alert d-none" id="alert"></div>
-                            <p>Login: <strong data-prl-field="login"></strong></p>
                             <div class="mb-3">
-                                <label class="form-label" for="display-name">Display name</label>
+                                <label class="form-label required" for="login-input">Login</label>
+                                <input class="form-control" data-prl-input="login" id="login-input" type="text">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label required" for="display-name">Display name</label>
                                 <input class="form-control" data-prl-input="displayName" id="display-name" type="text">
                             </div>
                             <div class="mb-3">
@@ -58,10 +61,12 @@
                         <div class="card-body">
                             <ul class="list-group mb-3" id="groups-list"></ul>
                             <div class="input-group">
-                                <select class="form-select" data-prl-options="prl.studentGroupViewService.getGroups"
-                                        id="add-group-id">
-                                    <option value="">- Select group -</option>
-                                </select>
+                                <input class="form-control" id="add-group-id" type="text"
+                                       data-prl-search-select="prl.studentGroupViewService.getGroups"
+                                       data-prl-value="id"
+                                       data-prl-label="name"
+                                       data-prl-all-label="- Select group -"
+                                       placeholder="Type to search groups...">
                                 <button class="btn btn-outline-primary" id="btn-add-group">Add</button>
                             </div>
                         </div>
@@ -77,6 +82,7 @@
                                        data-prl-args="subArgs"
                                        data-prl-empty="#subs-empty"
                                        data-prl-list="prl.submissionViewService.getSubmissions"
+                                       data-prl-paged="true"
                                        data-prl-row="subRow">
                                     <thead>
                                         <tr>
@@ -115,7 +121,7 @@
             }
 
             function updateArgs() {
-                return [studentId, Prl.val("#display-name"), Prl.val("#gitlab-name")];
+                return [studentId, Prl.val("#login-input"), Prl.val("#display-name"), Prl.val("#gitlab-name")];
             }
 
             function reloadStudent() {
@@ -140,7 +146,10 @@
                     li.appendChild(Prl.el("span", {text: names[i] || ("Group #" + gid)}));
                     li.appendChild(Prl.el("button", {
                         className: "btn btn-sm btn-outline-danger", text: "Remove",
-                        onClick: () => ViewEngine.call(SVC, "removeFromGroup", [studentId, gid]).then(reloadStudent),
+                        onClick: () => Prl.confirmCall(
+                            "Remove this student from group '" + (names[i] || gid) + "'?",
+                            SVC, "removeFromGroup", [studentId, gid], reloadStudent,
+                        ),
                     }));
                     ul.appendChild(li);
                 });
@@ -156,7 +165,7 @@
             });
 
             Prl.$("#btn-add-group").addEventListener("click", () => {
-                const gid = Prl.parseLong(Prl.val("#add-group-id"));
+                const gid = Prl.parseLong(Prl.dataVal("#add-group-id"));
                 if (gid != null) ViewEngine.call(SVC, "addToGroup", [studentId, gid]).then(reloadStudent);
             });
 

@@ -1,9 +1,11 @@
 package com.nelos.parallel.pipeline.core.service.impl
 
 import com.nelos.parallel.commons.adapter.vo.request.ProgressEvent
+import com.nelos.parallel.commons.adapter.vo.response.ScalabilityPoint
 import com.nelos.parallel.commons.adapter.vo.response.ScenarioResult
 import com.nelos.parallel.commons.adapter.vo.response.TaskResult
 import com.nelos.parallel.commons.adapter.vo.response.TestRun
+import com.nelos.parallel.commons.adapter.vo.response.TestSummary
 import org.springframework.stereotype.Service
 import java.util.*
 
@@ -47,6 +49,7 @@ class SubmissionResultLogFormatter {
                 p.memoryLimitMb?.let { "memory=${it}MB" },
                 p.wallTimeSec?.let { "wall_time=${it}s" },
                 p.cpuTimeSec?.let { "cpu_time=${it}s" },
+                p.warmupIterations?.takeIf { it > 0 }?.let { "warmup=$it" },
             )
             if (parts.isNotEmpty()) line("[params] ${parts.joinToString(", ")}")
         }
@@ -119,36 +122,7 @@ class SubmissionResultLogFormatter {
             listOfNotNull(
                 sum.correctness?.let { "Correctness" to it },
                 sum.performance?.let { "Performance" to it },
-            ).forEach { (mode, s) ->
-                section("Summary: $mode")
-                line("  Tests: ${s.passed ?: 0}/${s.totalTests ?: 0} passed, ${s.failed ?: 0} failed")
-                val categories = listOfNotNull(
-                    s.failedByTimeout?.takeIf { it > 0 }?.let { "$it timeout" },
-                    s.failedByOom?.takeIf { it > 0 }?.let { "$it OOM" },
-                    s.failedByCrash?.takeIf { it > 0 }?.let { "$it crash" },
-                    s.failedByCorrectness?.takeIf { it > 0 }?.let { "$it incorrect" },
-                )
-                if (categories.isNotEmpty()) line("  Failure breakdown: ${categories.joinToString(", ")}")
-                s.maxTimeMs?.let { line("  Max time: %.0fms".format(it)) }
-                s.maxRssKb?.let { line("  Peak RSS: ${it / 1024}MB") }
-                s.maxCgMemPeakKb?.let { line("  Peak cgroup memory: ${it / 1024}MB") }
-                s.totalCpuTimeSec?.let { line("  Total CPU time: %.2fs".format(Locale.ROOT, it)) }
-                s.scalability?.let { pts ->
-                    line("  Scalability:")
-                    line("    Threads | Time      | Speedup | Efficiency | CPU time  | Memory")
-                    line("    --------|-----------|---------|------------|-----------|-------")
-                    pts.forEach { p ->
-                        line(
-                            "    %7d | %7.0fms | %5.2fx  | %8.0f%%  | %7.2fs  | %dMB".format(
-                                Locale.ROOT,
-                                p.threads ?: 0, p.totalTimeMs ?: 0.0, p.speedup ?: 0.0,
-                                (p.efficiency ?: 0.0) * 100, p.totalCpuTimeSec ?: 0.0,
-                                (p.maxRssKb ?: 0) / 1024,
-                            )
-                        )
-                    }
-                }
-            }
+            ).forEach { (mode, s) -> renderSummary(logs, "Summary: $mode", s) }
         }
 
         line("")
@@ -195,6 +169,53 @@ class SubmissionResultLogFormatter {
                 if (!run.passed) logFailedRun(logs, run)
             }
         }
+        scenario.summary?.let { renderSummary(logs, "$label: ${scenario.name} Summary", it) }
+    }
+
+    private fun renderSummary(logs: MutableList<String>, title: String, s: TestSummary) {
+        logs.add("")
+        logs.add("--- $title ---")
+        logs.add("  Tests: ${s.passed ?: 0}/${s.totalTests ?: 0} passed, ${s.failed ?: 0} failed")
+        val categories = listOfNotNull(
+            s.failedByTimeout?.takeIf { it > 0 }?.let { "$it timeout" },
+            s.failedByOom?.takeIf { it > 0 }?.let { "$it OOM" },
+            s.failedByCrash?.takeIf { it > 0 }?.let { "$it crash" },
+            s.failedByCorrectness?.takeIf { it > 0 }?.let { "$it incorrect" },
+        )
+        if (categories.isNotEmpty()) logs.add("  Failure breakdown: ${categories.joinToString(", ")}")
+        s.maxTimeMs?.let { logs.add("  Max time: %.0fms".format(Locale.ROOT, it)) }
+        s.maxRssKb?.let { logs.add("  Peak RSS: ${it / 1024}MB") }
+        s.maxCgMemPeakKb?.let { logs.add("  Peak cgroup memory: ${it / 1024}MB") }
+        s.totalCpuTimeSec?.let { logs.add("  Total CPU time: %.2fs".format(Locale.ROOT, it)) }
+        s.scalability?.takeIf { it.isNotEmpty() }?.let { renderScalability(logs, it) }
+    }
+
+    private fun renderScalability(logs: MutableList<String>, points: List<ScalabilityPoint>) {
+        logs.add("  Scalability:")
+        logs.add("    Threads | Time      | Speedup | Efficiency | CPU time  | Memory  | Tests")
+        logs.add("    --------|-----------|---------|------------|-----------|---------|------")
+        points.forEach { p ->
+            logs.add(
+                "    %7d | %7.0fms | %5.2fx  | %8.0f%%  | %7.2fs  | %5dMB  | %s".format(
+                    Locale.ROOT,
+                    p.threads ?: 0, p.totalTimeMs ?: 0.0, p.speedup ?: 0.0,
+                    (p.efficiency ?: 0.0) * 100, p.totalCpuTimeSec ?: 0.0,
+                    (p.maxRssKb ?: 0) / 1024,
+                    formatTestsCell(p.testsCompared, p.testsSkipped),
+                )
+            )
+        }
+    }
+
+    // Renders the trailing "Tests" cell of the scalability table. testsCompared
+    // is the number of tests that passed on both T=1 baseline and this thread
+    // count (i.e. contributed to speedup/efficiency); testsSkipped is the rest.
+    // Older engine builds omitted both fields - we fall back to "-".
+    private fun formatTestsCell(compared: Int?, skipped: Int?): String {
+        if (compared == null && skipped == null) return "-"
+        val c = compared ?: 0
+        val total = c + (skipped ?: 0)
+        return "$c/$total"
     }
 
     private fun logFailedRun(logs: MutableList<String>, run: TestRun) {
@@ -242,7 +263,7 @@ class SubmissionResultLogFormatter {
             "resolveTests" to "Could not clone/fetch the test repository. Check git URL, branch, and access token.",
             "resolveSolution" to "Could not clone/fetch the solution repository. Check git URL, branch, and access token.",
             "parseConfig" to "Failed to parse assignment config.json on the engine. This is likely an instructor issue.",
-            "detectFramework" to "Engine could not detect a supported test framework for the assignment.",
+            "detectFramework" to "Could not detect a test framework, or the detected one is not in the assignment's allowed list.",
             "validation" to "Student solution uses forbidden libraries/dependencies.",
             "buildRunner" to "Student code failed to compile. See build output below.",
             "buildPlugins" to "Test plugins failed to compile. This is likely an instructor issue.",

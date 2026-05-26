@@ -17,4 +17,14 @@
     <logger name="org.hibernate" level="ERROR"/>
     <logger name="org.springframework" level="INFO"/>
     <logger name="com.nelos.parallel" level="DEBUG"/>
+    <!-- AbstractView.render() emits a per-request DEBUG line ("View [HtmlView],
+         model {}") under our subclass logger - mute it, we don't render any
+         model state anyway. -->
+    <logger name="com.nelos.parallel.commons.view.HtmlView" level="INFO"/>
+    <!-- HikariCP's PoolBase logs WARN on every successful self-heal when a
+         NAT/firewall has dropped an idle TCP connection between requests.
+         The pool acquires a fresh one and the request succeeds, so this is
+         purely noise on a remote-PG setup. Bump to ERROR; real pool problems
+         (acquisition failures, leaks) still surface from other Hikari loggers. -->
+    <logger name="com.zaxxer.hikari.pool.PoolBase" level="ERROR"/>
 </configuration>

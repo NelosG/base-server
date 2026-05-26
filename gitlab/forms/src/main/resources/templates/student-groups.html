@@ -22,171 +22,368 @@
                 </button>
             </div>
 
-            <div class="card mb-3 d-none" id="form-card">
-                <div class="card-body">
-                    <h5 class="card-title" id="form-title">New group</h5>
-                    <div class="alert d-none" id="form-alert"></div>
+            <input class="form-control form-control-sm mb-3" id="group-search"
+                   data-prl-list-filter=".group-item"
+                   placeholder="Search groups..." type="text">
 
-                    <input id="group-id" type="hidden">
-                    <div class="mb-3">
-                        <label class="form-label" for="group-name">Name *</label>
-                        <input class="form-control" id="group-name" type="text">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label" for="group-description">Description</label>
-                        <input class="form-control" id="group-description" type="text">
-                    </div>
+            <div id="new-group-form" style="display:none;"></div>
 
-                    <h6>Members</h6>
-                    <ul class="list-group mb-2" id="members-list"></ul>
-                    <div class="input-group mb-3">
-                        <input class="form-control" id="add-gitlab-name" placeholder="GitLab username" type="text">
-                        <input class="form-control" id="add-display-name" placeholder="Display name (optional)"
-                               type="text">
-                        <button class="btn btn-outline-primary" id="btn-add-member">Add</button>
-                    </div>
-
-                    <button class="btn btn-success"
-                            data-prl-alert="#form-alert"
-                            data-prl-args="saveArgs"
-                            data-prl-form="prl.studentGroupViewService.saveGroup"
-                            data-prl-success="onSaved"
-                            data-prl-validate="validateGroup">Save
-                    </button>
-                    <button class="btn btn-outline-danger d-none" id="btn-delete">Delete</button>
-                    <button class="btn btn-outline-secondary" id="btn-cancel">Cancel</button>
-                </div>
+            <div class="text-center mt-3" id="loading">
+                <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
             </div>
-
-            <div class="card">
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0"
-                               data-prl-empty="#empty"
-                               data-prl-list="prl.studentGroupViewService.getGroups"
-                               data-prl-row="groupRow">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Description</th>
-                                    <th>Members</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                    <div class="text-center text-muted p-3 d-none" id="empty">No groups.</div>
-                </div>
-            </div>
+            <div id="groups-list" style="display:none;"></div>
+            <div class="text-center text-muted p-3 d-none" id="empty">No groups.</div>
         </div>
 
         <script>
             const SVC = "prl.studentGroupViewService";
-            let members = [];   // [{gitlabName, displayName}]
+            const STUDENT_SVC = "prl.studentViewService";
 
-            function groupRow(g) {
-                const tr = document.createElement("tr");
-                tr.appendChild(Prl.td(g.name || ""));
-                tr.appendChild(Prl.td(g.description || ""));
-                tr.appendChild(Prl.td(String(g.memberCount || 0)));
-                const td = document.createElement("td");
-                td.appendChild(Prl.el("button", {
-                    className: "btn btn-sm btn-outline-secondary me-1", text: "Edit",
-                    onClick: () => openForm(g),
-                }));
-                tr.appendChild(td);
-                return tr;
+            let allStudents = null;
+            let editingGroupId = null;
+            let activeFormEl = null;
+            let workingMembers = [];
+            // Generation counter - every open*/closeForm bumps it so a stale
+            // async ensureStudents() promise can't drop a second form into the
+            // DOM after a faster click has already moved on.
+            let openSeq = 0;
+
+            // --- Loading -----------------------------------------------------
+
+            function loadGroups() {
+                document.getElementById("loading").style.display = "";
+                document.getElementById("groups-list").style.display = "none";
+                document.getElementById("empty").classList.add("d-none");
+                ViewEngine.call(SVC, "getGroups").then(groups => {
+                    document.getElementById("loading").style.display = "none";
+                    renderGroups(groups || []);
+                }).catch(err => Prl.alert("body", "danger", "Failed to load: " + err));
             }
 
-            function openForm(group) {
-                Prl.fillTexts({"#form-title": group ? ("Edit: " + group.name) : "New group"});
-                Prl.$("#group-id").value = group?.id || "";
-                Prl.$("#group-name").value = group?.name || "";
-                Prl.$("#group-description").value = group?.description || "";
-                members = (group?.members || []).map(m => ({
-                    gitlabName: m.gitlabName,
-                    displayName: m.displayName || ""
+            function ensureStudents() {
+                if (allStudents) return Promise.resolve(allStudents);
+                return ViewEngine.call(STUDENT_SVC, "getStudents", [null]).then(list => {
+                    allStudents = list || [];
+                    return allStudents;
+                });
+            }
+
+            function renderGroups(groups) {
+                const list = document.getElementById("groups-list");
+                list.replaceChildren();
+                if (groups.length === 0) {
+                    document.getElementById("empty").classList.remove("d-none");
+                    return;
+                }
+                const wrap = document.createElement("div");
+                wrap.className = "list-group";
+                groups.forEach(g => wrap.appendChild(buildRow(g)));
+                list.appendChild(wrap);
+                list.style.display = "";
+                Prl.reapplyListFilters();
+            }
+
+            function buildRow(g) {
+                const item = document.createElement("div");
+                item.className = "list-group-item list-group-item-action group-item";
+                item.style.cursor = "pointer";
+                const haystack = [g.name, g.description].filter(Boolean).join(" ").toLowerCase();
+                item.setAttribute("data-search", haystack);
+                item.setAttribute("data-group-id", g.id || "");
+
+                const info = document.createElement("div");
+                info.appendChild(Prl.el("strong", {text: g.name || ""}));
+                if (g.description) {
+                    info.appendChild(document.createTextNode(" - " + g.description));
+                }
+                info.appendChild(document.createElement("br"));
+                info.appendChild(Prl.el("small", {
+                    className: "text-muted",
+                    text: (g.memberCount || 0) + " member(s)",
                 }));
-                renderMembers();
-                Prl.$("#form-card").classList.remove("d-none");
-                Prl.$("#btn-delete").classList.toggle("d-none", !group);
+
+                item.appendChild(info);
+                item.addEventListener("click", () => {
+                    if (editingGroupId === g.id) closeForm();
+                    else openInlineEdit(g, item);
+                });
+                return item;
+            }
+
+            // --- Form lifecycle ---------------------------------------------
+
+            function openInlineEdit(group, afterEl) {
+                closeForm();
+                editingGroupId = group.id;
+                const myToken = ++openSeq;
+                ensureStudents().then(() => {
+                    if (myToken !== openSeq) return;
+                    const form = buildFormCard(group);
+                    afterEl.parentNode.insertBefore(form, afterEl.nextSibling);
+                    activeFormEl = form;
+                });
+            }
+
+            function openNewForm() {
+                closeForm();
+                editingGroupId = null;
+                const myToken = ++openSeq;
+                ensureStudents().then(() => {
+                    if (myToken !== openSeq) return;
+                    const slot = document.getElementById("new-group-form");
+                    slot.replaceChildren(buildFormCard(null));
+                    slot.style.display = "";
+                    activeFormEl = slot;
+                });
             }
 
             function closeForm() {
-                Prl.$("#form-card").classList.add("d-none");
-                members = [];
+                editingGroupId = null;
+                workingMembers = [];
+                // Any in-flight open* whose token doesn't match the new openSeq
+                // will see itself as superseded and refuse to mutate the DOM.
+                ++openSeq;
+                if (activeFormEl) {
+                    if (activeFormEl.id === "new-group-form") {
+                        activeFormEl.style.display = "none";
+                        activeFormEl.replaceChildren();
+                    } else {
+                        activeFormEl.remove();
+                    }
+                    activeFormEl = null;
+                }
             }
 
-            function renderMembers() {
-                const ul = Prl.$("#members-list");
+            // Build the edit/create card with pure DOM construction (no innerHTML
+            // interpolation of user values - those are assigned via .value /
+            // .textContent below).
+            function buildFormCard(group) {
+                workingMembers = (group?.members || []).map(m => ({
+                    userId: m.userId, login: m.login,
+                    displayName: m.displayName, gitlabName: m.gitlabName,
+                }));
+
+                // position:relative + a small z-index lifts the whole form
+                // (and its absolutely-positioned member-results dropdown)
+                // above neighbouring list-group rows so the dropdown can't
+                // visually slip under the next group.
+                const card = Prl.el("div", {className: "card mt-1 mb-2"});
+                card.style.position = "relative";
+                card.style.zIndex = "10";
+                const body = Prl.el("div", {className: "card-body"});
+
+                const title = Prl.el("h5", {className: "card-title"});
+                title.textContent = group ? ("Edit: " + (group.name || "")) : "New group";
+                body.appendChild(title);
+
+                const alertEl = Prl.el("div", {className: "alert d-none form-alert"});
+                body.appendChild(alertEl);
+
+                const idInput = Prl.el("input", {className: "form-id"});
+                idInput.type = "hidden";
+                idInput.value = group?.id || "";
+                body.appendChild(idInput);
+
+                body.appendChild(textField("Name", "form-name", group?.name || "", true));
+                body.appendChild(textField("Description", "form-description", group?.description || "", false));
+
+                body.appendChild(Prl.el("h6", {text: "Members"}));
+                const ul = Prl.el("ul", {className: "list-group mb-2 members-list"});
+                body.appendChild(ul);
+
+                body.appendChild(memberSearchBlock());
+
+                const save = Prl.el("button", {className: "btn btn-success btn-save", text: "Save"});
+                save.addEventListener("click", () => doSave(card, group));
+                body.appendChild(save);
+                body.appendChild(document.createTextNode(" "));
+
+                if (group) {
+                    const del = Prl.el("button", {className: "btn btn-outline-danger btn-delete", text: "Delete"});
+                    del.addEventListener("click", () => doDelete(card));
+                    body.appendChild(del);
+                    body.appendChild(document.createTextNode(" "));
+                }
+
+                const cancel = Prl.el("button", {className: "btn btn-outline-secondary btn-cancel", text: "Cancel"});
+                cancel.addEventListener("click", closeForm);
+                body.appendChild(cancel);
+
+                card.appendChild(body);
+                renderMembers(card);
+                attachMemberSearch(card);
+                return card;
+            }
+
+            function textField(labelText, inputClass, value, required) {
+                const wrap = Prl.el("div", {className: "mb-3"});
+                const label = Prl.el("label", {className: "form-label" + (required ? " required" : ""), text: labelText});
+                wrap.appendChild(label);
+                const input = Prl.el("input", {className: "form-control " + inputClass});
+                input.type = "text";
+                input.value = value;
+                wrap.appendChild(input);
+                return wrap;
+            }
+
+            function memberSearchBlock() {
+                const wrap = Prl.el("div", {className: "position-relative mb-3"});
+                const input = Prl.el("input", {className: "form-control member-search"});
+                input.type = "text";
+                input.placeholder = "Add member - type to search students...";
+                input.autocomplete = "off";
+                wrap.appendChild(input);
+                const results = Prl.el("div", {className: "list-group position-absolute w-100 member-results shadow"});
+                results.style.display = "none";
+                // Higher than the card's own z-index so it floats above the
+                // form's own buttons row when the list is long.
+                results.style.zIndex = "1050";
+                results.style.maxHeight = "240px";
+                results.style.overflowY = "auto";
+                wrap.appendChild(results);
+                return wrap;
+            }
+
+            // --- Member list management -------------------------------------
+
+            function renderMembers(card) {
+                const ul = card.querySelector(".members-list");
                 ul.replaceChildren();
-                if (members.length === 0) {
+                if (workingMembers.length === 0) {
                     ul.appendChild(Prl.el("li", {className: "list-group-item text-muted", text: "No members yet"}));
                     return;
                 }
-                members.forEach((m, idx) => {
+                workingMembers.forEach((m, idx) => {
                     const li = Prl.el("li", {className: "list-group-item d-flex justify-content-between align-items-center"});
-                    li.appendChild(Prl.el("span", {text: m.gitlabName + (m.displayName ? " (" + m.displayName + ")" : "")}));
+                    li.appendChild(Prl.el("span", {text: memberLabel(m)}));
                     li.appendChild(Prl.el("button", {
                         className: "btn btn-sm btn-outline-danger", text: "Remove",
                         onClick: () => {
-                            members.splice(idx, 1);
-                            renderMembers();
+                            workingMembers.splice(idx, 1);
+                            renderMembers(card);
                         },
                     }));
                     ul.appendChild(li);
                 });
             }
 
-            function addMember() {
-                const gitlabName = Prl.val("#add-gitlab-name").trim();
-                const displayName = Prl.val("#add-display-name").trim();
-                if (!gitlabName) return;
-                if (members.some(m => m.gitlabName === gitlabName)) {
-                    Prl.alert("#form-alert", "warning", "User '" + gitlabName + "' already added");
+            function memberLabel(m) {
+                const main = m.login || m.gitlabName || ("user#" + m.userId);
+                const extras = [];
+                if (m.displayName && m.displayName !== main) extras.push(m.displayName);
+                if (m.gitlabName && m.gitlabName !== main) extras.push("gitlab: " + m.gitlabName);
+                return main + (extras.length ? " (" + extras.join(", ") + ")" : "");
+            }
+
+            // --- Student typeahead for adding members -----------------------
+
+            function attachMemberSearch(card) {
+                const input = card.querySelector(".member-search");
+                const results = card.querySelector(".member-results");
+
+                function close() {
+                    results.style.display = "none";
+                    results.replaceChildren();
+                }
+
+                function render(matches) {
+                    results.replaceChildren();
+                    if (matches.length === 0) {
+                        results.appendChild(Prl.el("div", {
+                            className: "list-group-item text-muted small",
+                            text: "No matching students",
+                        }));
+                    } else {
+                        matches.forEach(s => {
+                            const taken = workingMembers.some(m => m.userId === s.id);
+                            const labelMain = (s.login || ("#" + s.id)) +
+                                (s.displayName && s.displayName !== s.login ? " - " + s.displayName : "") +
+                                (s.gitlabName ? " (gitlab: " + s.gitlabName + ")" : "") +
+                                (taken ? " - already added" : "");
+                            const btn = Prl.el("button", {
+                                className: "list-group-item list-group-item-action text-truncate" + (taken ? " disabled" : ""),
+                                text: labelMain,
+                            });
+                            btn.type = "button";
+                            btn.disabled = taken;
+                            btn.addEventListener("mousedown", e => {
+                                e.preventDefault();
+                                if (taken) return;
+                                workingMembers.push({
+                                    userId: s.id, login: s.login,
+                                    displayName: s.displayName, gitlabName: s.gitlabName,
+                                });
+                                input.value = "";
+                                renderMembers(card);
+                                // Keep the dropdown open with a refreshed list
+                                // so the instructor can pick another member
+                                // without clicking out and back in.
+                                refresh();
+                                input.focus();
+                            });
+                            results.appendChild(btn);
+                        });
+                    }
+                    results.style.display = "block";
+                }
+
+                function refresh() {
+                    const q = input.value.trim().toLowerCase();
+                    const pool = allStudents || [];
+                    const matches = (!q ? pool : pool.filter(s => {
+                        const hay = [s.login, s.displayName, s.gitlabName].filter(Boolean).join(" ").toLowerCase();
+                        return hay.indexOf(q) !== -1;
+                    })).slice(0, 50);
+                    render(matches);
+                }
+
+                input.addEventListener("input", refresh);
+                input.addEventListener("focus", refresh);
+                input.addEventListener("blur", () => setTimeout(close, 150));
+            }
+
+            // --- Save / Delete ----------------------------------------------
+
+            function doSave(card, group) {
+                const name = card.querySelector(".form-name").value.trim();
+                const alertEl = card.querySelector(".form-alert");
+                if (!name) {
+                    Prl.alert(alertEl, "danger", "Name is required");
                     return;
                 }
-                members.push({gitlabName, displayName});
-                Prl.$("#add-gitlab-name").value = "";
-                Prl.$("#add-display-name").value = "";
-                renderMembers();
-            }
-
-            function validateGroup() {
-                return Prl.val("#group-name").trim() ? null : "Name is required";
-            }
-
-            function saveArgs() {
-                const id = Prl.val("#group-id");
-                return [{
-                    id: id ? parseInt(id, 10) : null,
-                    name: Prl.val("#group-name").trim(),
-                    description: Prl.val("#group-description").trim() || null,
-                    members: members,
-                }];
-            }
-
-            function onSaved() {
-                closeForm();
-                Prl.reloadList();
-            }
-
-            function deleteGroup() {
-                const id = Prl.val("#group-id");
-                if (!id) return;
-                Prl.confirmCall("Delete this group?", SVC, "deleteGroup", [parseInt(id, 10)],
-                    () => {
+                const payload = {
+                    id: group?.id || null,
+                    name: name,
+                    description: card.querySelector(".form-description").value.trim() || null,
+                    members: workingMembers.map(m => ({
+                        userId: m.userId, login: m.login,
+                        displayName: m.displayName, gitlabName: m.gitlabName,
+                    })),
+                };
+                ViewEngine.call(SVC, "saveGroup", [payload])
+                    .then(() => {
                         closeForm();
-                        Prl.reloadList();
-                    });
+                        loadGroups();
+                    })
+                    .catch(err => Prl.alert(alertEl, "danger", "Save failed: " + (err.message || err)));
             }
+
+            function doDelete(card) {
+                const id = parseInt(card.querySelector(".form-id").value, 10);
+                if (!id) return;
+                Prl.confirmCall("Delete this group?", SVC, "deleteGroup", [id], () => {
+                    closeForm();
+                    loadGroups();
+                });
+            }
+
+            // --- Bootstrap --------------------------------------------------
+            // (Search wiring is declarative - see data-prl-list-filter on the
+            // <input> above; Prl.attachListFilter binds it on autoBind.)
 
             document.addEventListener("DOMContentLoaded", () => {
-                Prl.$("#btn-show-create").addEventListener("click", () => openForm(null));
-                Prl.$("#btn-cancel").addEventListener("click", closeForm);
-                Prl.$("#btn-add-member").addEventListener("click", addMember);
-                Prl.$("#btn-delete").addEventListener("click", deleteGroup);
+                document.getElementById("btn-show-create").addEventListener("click", openNewForm);
+                loadGroups();
             });
         </script>
     </body>

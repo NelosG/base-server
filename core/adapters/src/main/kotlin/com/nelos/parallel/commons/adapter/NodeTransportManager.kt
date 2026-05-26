@@ -5,6 +5,8 @@ import com.nelos.parallel.commons.adapter.enums.TransportType
 import com.nelos.parallel.commons.adapter.vo.NodeInfo
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * Manages transport-aware node deregistration and health check failures.
@@ -31,6 +33,7 @@ class NodeTransportManager(
      *
      * @return `true` if the node was fully removed, `false` if it's still alive via other transports
      */
+    @Transactional(propagation = Propagation.REQUIRED)
     fun handleTransportOffline(nodeId: String, offlineTransport: TransportType): Boolean {
         val remaining = nodeRegistry.removeTransport(nodeId, offlineTransport)
         if (remaining == null) {
@@ -124,6 +127,11 @@ class NodeTransportManager(
         val responding = discovered.map { it.nodeId }.toSet()
         LOG.info("{} discovery: {} node(s) replied", transport, discovered.size)
 
+        // Register live nodes first so a concurrent pipeline-submit reading the
+        // registry between this call and the stale cleanup never sees a window
+        // with fewer usable runners than actually exist.
+        discovered.forEach { nodeRegistry.register(it) }
+
         nodeRegistry.findByTransport(transport)
             .filter { it.nodeId !in responding }
             .forEach { stale ->
@@ -131,7 +139,6 @@ class NodeTransportManager(
                 LOG.info("{} node did not respond to discovery: {}", transport, stale.nodeId)
             }
 
-        discovered.forEach { nodeRegistry.register(it) }
         return discovered
     }
 

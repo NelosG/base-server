@@ -15,11 +15,14 @@ import com.fasterxml.jackson.annotation.JsonProperty
 @JsonIgnoreProperties(ignoreUnknown = true)
 class RunStats @JsonCreator constructor(
     @param:JsonProperty("timeMs") val timeMs: Double,
-    @param:JsonProperty("workMs") val workMs: Double,
-    @param:JsonProperty("spanMs") val spanMs: Double,
-    @param:JsonProperty("parallelism") val parallelism: Double,
     @param:JsonProperty("speedup") val speedup: Double,
     @param:JsonProperty("efficiency") val efficiency: Double,
+    // Monitoring-derived metrics: only present when the engine actually
+    // measured work/span (OpenMP monitor or stress mode). For cilk/parlay/seq
+    // and OpenMP in performance mode (monitor=normal) these are absent.
+    @param:JsonProperty("workMs") val workMs: Double? = null,
+    @param:JsonProperty("spanMs") val spanMs: Double? = null,
+    @param:JsonProperty("parallelism") val parallelism: Double? = null,
     @param:JsonProperty("computeEfficiency") val computeEfficiency: Double? = null,
     @param:JsonProperty("loadBalanceRatio") val loadBalanceRatio: Double? = null,
     @param:JsonProperty("avgTaskWorkMs") val avgTaskWorkMs: Double? = null,

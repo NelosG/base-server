@@ -25,6 +25,7 @@ class AssignmentView @JsonCreator constructor(
     @param:JsonProperty("wallTimeSec") val wallTimeSec: Int? = null,
     @param:JsonProperty("cpuTimeSec") val cpuTimeSec: Int? = null,
     @param:JsonProperty("maxProcesses") val maxProcesses: Int? = null,
+    @param:JsonProperty("warmupIterations") val warmupIterations: Int? = null,
     @param:JsonProperty("active") val active: Boolean? = null,
     @param:JsonProperty("evaluatorScript") val evaluatorScript: EvaluatorScript? = null,
 )
