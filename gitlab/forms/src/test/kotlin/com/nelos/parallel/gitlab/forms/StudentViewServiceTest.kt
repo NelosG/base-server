@@ -310,6 +310,50 @@ class StudentViewServiceTest {
         }
 
         @Test
+        fun `blank login is refused`() {
+            whenever(userService.tryFindById(ALICE_ID)).thenReturn(student(ALICE_ID, "alice"))
+
+            assertThrows<IllegalStateException> {
+                service.updateStudent(ALICE_ID, login = "   ", displayName = null, gitlabName = null)
+            }
+            verify(userService, never()).save(any<User>())
+        }
+
+        @Test
+        fun `login change to a value already taken by another user is rejected`() {
+            whenever(userService.tryFindById(ALICE_ID)).thenReturn(student(ALICE_ID, "alice"))
+            whenever(userService.findByLogin("bob")).thenReturn(student(BOB_ID, "bob"))
+
+            assertThrows<IllegalStateException> {
+                service.updateStudent(ALICE_ID, login = "bob", displayName = null, gitlabName = null)
+            }
+            verify(userService, never()).save(any<User>())
+        }
+
+        @Test
+        fun `login change to the same value is a no-op save`() {
+            whenever(userService.tryFindById(ALICE_ID)).thenReturn(student(ALICE_ID, "alice"))
+            stubEmptyReads()
+
+            service.updateStudent(ALICE_ID, login = "  alice  ", displayName = null, gitlabName = null)
+
+            verify(userService, never()).save(any<User>())
+        }
+
+        @Test
+        fun `login change to a free value is persisted (trimmed)`() {
+            whenever(userService.tryFindById(ALICE_ID)).thenReturn(student(ALICE_ID, "alice"))
+            whenever(userService.findByLogin("alice2")).thenReturn(null)
+            stubEmptyReads()
+
+            service.updateStudent(ALICE_ID, login = "  alice2  ", displayName = null, gitlabName = null)
+
+            val saved = argumentCaptor<User>()
+            verify(userService).save(saved.capture())
+            assertEquals("alice2", saved.firstValue.login)
+        }
+
+        @Test
         fun `setting a gitlab name when one exists updates it instead of duplicating`() {
             whenever(userService.tryFindById(ALICE_ID)).thenReturn(student(ALICE_ID))
             val existing = gitlabLink(ALICE_ID, "old-name")

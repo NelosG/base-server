@@ -51,6 +51,29 @@ class AssignmentViewServiceTest {
         this.evaluatorScript = evaluatorScript
     }
 
+    private fun saveRequest(
+        id: Long? = null,
+        code: String = "lab1",
+        name: String = "Lab 1",
+        gitlabProjectPath: String = "course/lab1",
+        testRepoUrl: String = "https://gitlab.example.com/tests/lab1.git",
+        testRepoBranch: String = "main",
+        description: String? = null,
+        memoryLimitMb: Long? = null,
+        threads: Int? = null,
+        wallTimeSec: Int? = null,
+        cpuTimeSec: Int? = null,
+        maxProcesses: Int? = null,
+        active: Boolean = true,
+        evaluatorScript: EvaluatorScript? = null,
+    ) = SaveAssignmentRequest(
+        id = id, code = code, name = name, gitlabProjectPath = gitlabProjectPath,
+        testRepoUrl = testRepoUrl, testRepoBranch = testRepoBranch, description = description,
+        memoryLimitMb = memoryLimitMb, threads = threads, wallTimeSec = wallTimeSec,
+        cpuTimeSec = cpuTimeSec, maxProcesses = maxProcesses, active = active,
+        evaluatorScript = evaluatorScript,
+    )
+
     private fun gitlabProject(
         namespace: String,
         webUrl: String = "https://gitlab.example.com/$namespace/lab1",
@@ -64,7 +87,7 @@ class AssignmentViewServiceTest {
         markedForDeletionAt = deleted,
     )
 
-    // --- saveAssignment partial update ----------------------------------
+    // --- saveAssignment (PUT semantics) ---------------------------------
 
     @Nested
     inner class SaveAssignment {
@@ -73,9 +96,7 @@ class AssignmentViewServiceTest {
         fun `creates new assignment when id is null`() {
             whenever(assignmentService.save(any<Assignment>())).thenAnswer { it.arguments[0] as Assignment }
 
-            service.saveAssignment(
-                SaveAssignmentRequest(code = "lab2", name = "Lab 2", gitlabProjectPath = "c/lab2"),
-            )
+            service.saveAssignment(saveRequest(code = "lab2", name = "Lab 2", gitlabProjectPath = "c/lab2"))
 
             val saved = argumentCaptor<Assignment>()
             verify(assignmentService).save(saved.capture())
@@ -86,38 +107,59 @@ class AssignmentViewServiceTest {
         }
 
         @Test
-        fun `partial update keeps existing fields where the request is null`() {
-            val existing = assignment(id = 1L, code = "old-code", name = "Old Name")
+        fun `null numeric fields persist as null so the engine falls back to its defaults`() {
+            // The bug this guards against: clearing the "Memory (MB)" input in
+            // the UI used to keep the previous value because `data ?: existing`
+            // discarded the explicit null. PUT semantics now overwrite.
+            val existing = assignment(id = 1L)
+            existing.memoryLimitMb = 4096L
             existing.threads = 8
-            existing.memoryLimitMb = 256L
-            whenever(assignmentService.findById(1L)).thenReturn(existing)
-            whenever(assignmentService.save(any<Assignment>())).thenAnswer { it.arguments[0] as Assignment }
-
-            service.saveAssignment(SaveAssignmentRequest(id = 1L, name = "New Name"))
-
-            val saved = argumentCaptor<Assignment>()
-            verify(assignmentService).save(saved.capture())
-            assertEquals("old-code", saved.firstValue.code) // untouched
-            assertEquals("New Name", saved.firstValue.name) // updated
-            assertEquals(8, saved.firstValue.threads)        // untouched
-            assertEquals(256L, saved.firstValue.memoryLimitMb)
-        }
-
-        @Test
-        fun `clearEvaluatorScript=true wipes the script even if evaluatorScript field is also provided`() {
-            // The instructor toggled "remove script" but the front-end also happened to send
-            // the current draft - the explicit clear must win.
-            val existing = assignment(id = 1L, evaluatorScript = EvaluatorScript(ScriptType.KTS, "old"))
+            existing.wallTimeSec = 120
+            existing.cpuTimeSec = 60
+            existing.maxProcesses = 32
             whenever(assignmentService.findById(1L)).thenReturn(existing)
             whenever(assignmentService.save(any<Assignment>())).thenAnswer { it.arguments[0] as Assignment }
 
             service.saveAssignment(
-                SaveAssignmentRequest(
+                saveRequest(
                     id = 1L,
-                    clearEvaluatorScript = true,
-                    evaluatorScript = EvaluatorScript(ScriptType.KTS, "new draft"),
+                    memoryLimitMb = null, threads = null,
+                    wallTimeSec = null, cpuTimeSec = null, maxProcesses = null,
                 ),
             )
+
+            val saved = argumentCaptor<Assignment>()
+            verify(assignmentService).save(saved.capture())
+            assertNull(saved.firstValue.memoryLimitMb)
+            assertNull(saved.firstValue.threads)
+            assertNull(saved.firstValue.wallTimeSec)
+            assertNull(saved.firstValue.cpuTimeSec)
+            assertNull(saved.firstValue.maxProcesses)
+        }
+
+        @Test
+        fun `non-null numeric fields are persisted as given`() {
+            val existing = assignment(id = 1L)
+            whenever(assignmentService.findById(1L)).thenReturn(existing)
+            whenever(assignmentService.save(any<Assignment>())).thenAnswer { it.arguments[0] as Assignment }
+
+            service.saveAssignment(
+                saveRequest(id = 1L, memoryLimitMb = 2048L, threads = 4),
+            )
+
+            val saved = argumentCaptor<Assignment>()
+            verify(assignmentService).save(saved.capture())
+            assertEquals(2048L, saved.firstValue.memoryLimitMb)
+            assertEquals(4, saved.firstValue.threads)
+        }
+
+        @Test
+        fun `null evaluatorScript clears the existing one (PUT semantics)`() {
+            val existing = assignment(id = 1L, evaluatorScript = EvaluatorScript(ScriptType.KTS, "old"))
+            whenever(assignmentService.findById(1L)).thenReturn(existing)
+            whenever(assignmentService.save(any<Assignment>())).thenAnswer { it.arguments[0] as Assignment }
+
+            service.saveAssignment(saveRequest(id = 1L, evaluatorScript = null))
 
             val saved = argumentCaptor<Assignment>()
             verify(assignmentService).save(saved.capture())
@@ -125,13 +167,13 @@ class AssignmentViewServiceTest {
         }
 
         @Test
-        fun `evaluatorScript field replaces the existing one when clearEvaluatorScript is not set`() {
+        fun `non-null evaluatorScript replaces the existing one`() {
             val existing = assignment(id = 1L, evaluatorScript = EvaluatorScript(ScriptType.KTS, "old"))
             whenever(assignmentService.findById(1L)).thenReturn(existing)
             whenever(assignmentService.save(any<Assignment>())).thenAnswer { it.arguments[0] as Assignment }
 
             service.saveAssignment(
-                SaveAssignmentRequest(id = 1L, evaluatorScript = EvaluatorScript(ScriptType.PYTHON, "new")),
+                saveRequest(id = 1L, evaluatorScript = EvaluatorScript(ScriptType.PYTHON, "new")),
             )
 
             val saved = argumentCaptor<Assignment>()
@@ -139,19 +181,31 @@ class AssignmentViewServiceTest {
             assertEquals(ScriptType.PYTHON, saved.firstValue.evaluatorScript?.type)
             assertEquals("new", saved.firstValue.evaluatorScript?.source)
         }
+    }
+
+    // --- setAssignmentActive (partial toggle) ---------------------------
+
+    @Nested
+    inner class SetAssignmentActive {
 
         @Test
-        fun `null evaluatorScript without clearEvaluatorScript leaves the existing script untouched`() {
-            val script = EvaluatorScript(ScriptType.KTS, "untouched")
-            val existing = assignment(id = 1L, evaluatorScript = script)
+        fun `flips active flag and leaves every other field untouched`() {
+            val existing = assignment(id = 1L)
+            existing.memoryLimitMb = 2048L
+            existing.threads = 4
+            existing.active = true
             whenever(assignmentService.findById(1L)).thenReturn(existing)
             whenever(assignmentService.save(any<Assignment>())).thenAnswer { it.arguments[0] as Assignment }
 
-            service.saveAssignment(SaveAssignmentRequest(id = 1L, name = "renamed"))
+            service.setAssignmentActive(1L, false)
 
             val saved = argumentCaptor<Assignment>()
             verify(assignmentService).save(saved.capture())
-            assertEquals(script, saved.firstValue.evaluatorScript)
+            // Only active flipped - the partial toggle must NOT trample the
+            // resource-limit fields the way a full PUT would.
+            assertEquals(false, saved.firstValue.active)
+            assertEquals(2048L, saved.firstValue.memoryLimitMb)
+            assertEquals(4, saved.firstValue.threads)
         }
     }
 
@@ -159,7 +213,10 @@ class AssignmentViewServiceTest {
 
     @Test
     fun `getGitLabProjects filters out forks and marked-for-deletion projects`() {
-        whenever(gitLabApiClient.listProjects(eq("lab"))).thenReturn(
+        // Service no longer forwards the search string to GitLab (?search= only
+        // matches name, missing namespace-prefix queries). We fetch the full
+        // candidate list and filter ourselves; the stub uses null to match.
+        whenever(gitLabApiClient.listProjects(eq(null))).thenReturn(
             listOf(
                 gitlabProject("root"), // keep
                 gitlabProject("user1", forkedFrom = gitlabProject("root")), // drop: is a fork
@@ -168,6 +225,22 @@ class AssignmentViewServiceTest {
         )
 
         val result = service.getGitLabProjects("lab")
+
+        assertEquals(listOf("root/lab1"), result.map { it.pathWithNamespace })
+    }
+
+    @Test
+    fun `getGitLabProjects filters by full path substring (namespace match)`() {
+        whenever(gitLabApiClient.listProjects(eq(null))).thenReturn(
+            listOf(
+                gitlabProject("root"),        // "root/lab1"
+                gitlabProject("other"),       // "other/lab1"
+            ),
+        )
+
+        // "root" only appears in the namespace - GitLab's ?search= wouldn't
+        // match this. We must.
+        val result = service.getGitLabProjects("root")
 
         assertEquals(listOf("root/lab1"), result.map { it.pathWithNamespace })
     }
@@ -264,5 +337,219 @@ class AssignmentViewServiceTest {
             // Pre-existing-but-deleted fork must NOT short-circuit the new fork.
             verify(gitLabApiClient).forkProject("course/lab1", "alice")
         }
+
+        @Test
+        fun `createForks resolves usernames from groupIds via gitlab mapping`() {
+            // The UI can send either explicit usernames (legacy) or one/several
+            // groupIds. When groupIds are present, the service walks each group's
+            // members, looks up the gitlab name in GitlabUser, and forks against
+            // those names. Users without a gitlab mapping silently drop.
+            whenever(assignmentService.findById(1L)).thenReturn(assignment())
+            whenever(memberService.findByGroupId(10L)).thenReturn(
+                listOf(
+                    com.nelos.parallel.pipeline.data.entity.StudentGroupMember()
+                        .apply { groupId = 10L; userId = 1L },
+                    com.nelos.parallel.pipeline.data.entity.StudentGroupMember()
+                        .apply { groupId = 10L; userId = 2L },
+                    com.nelos.parallel.pipeline.data.entity.StudentGroupMember()
+                        .apply { groupId = 10L; userId = 3L }, // no gitlab mapping -> dropped
+                ),
+            )
+            whenever(gitlabUserService.findAll()).thenReturn(
+                listOf(
+                    com.nelos.parallel.gitlab.entity.GitlabUser()
+                        .apply { userId = 1L; gitLabName = "alice" },
+                    com.nelos.parallel.gitlab.entity.GitlabUser()
+                        .apply { userId = 2L; gitLabName = "bob" },
+                ),
+            )
+            whenever(gitLabApiClient.getProjectForks("course/lab1")).thenReturn(emptyList())
+            whenever(gitLabApiClient.forkProject(eq("course/lab1"), eq("alice")))
+                .thenReturn(gitlabProject("alice"))
+            whenever(gitLabApiClient.forkProject(eq("course/lab1"), eq("bob")))
+                .thenReturn(gitlabProject("bob"))
+
+            val res = service.createForks(CreateForksRequest(assignmentId = 1L, groupIds = listOf(10L)))
+
+            val results = res.results ?: error("results")
+            assertEquals(2, results.size)
+            assertEquals(setOf("alice", "bob"), results.map { it.username }.toSet())
+            verify(gitLabApiClient, never()).forkProject(any(), eq("user-3"))
+        }
+
+        @Test
+        fun `createForks deduplicates usernames when one user belongs to multiple groups`() {
+            whenever(assignmentService.findById(1L)).thenReturn(assignment())
+            whenever(memberService.findByGroupId(10L)).thenReturn(
+                listOf(com.nelos.parallel.pipeline.data.entity.StudentGroupMember()
+                    .apply { groupId = 10L; userId = 1L }),
+            )
+            whenever(memberService.findByGroupId(20L)).thenReturn(
+                listOf(com.nelos.parallel.pipeline.data.entity.StudentGroupMember()
+                    .apply { groupId = 20L; userId = 1L }),
+            )
+            whenever(gitlabUserService.findAll()).thenReturn(
+                listOf(com.nelos.parallel.gitlab.entity.GitlabUser()
+                    .apply { userId = 1L; gitLabName = "alice" }),
+            )
+            whenever(gitLabApiClient.getProjectForks("course/lab1")).thenReturn(emptyList())
+            whenever(gitLabApiClient.forkProject("course/lab1", "alice")).thenReturn(gitlabProject("alice"))
+
+            val res = service.createForks(CreateForksRequest(assignmentId = 1L, groupIds = listOf(10L, 20L)))
+
+            // The same user must not be forked twice across overlapping groups.
+            assertEquals(1, (res.results ?: error("results")).size)
+            verify(gitLabApiClient).forkProject("course/lab1", "alice")
+        }
+
+        @Test
+        fun `createForks falls back to legacy single groupId field`() {
+            whenever(assignmentService.findById(1L)).thenReturn(assignment())
+            whenever(memberService.findByGroupId(99L)).thenReturn(
+                listOf(com.nelos.parallel.pipeline.data.entity.StudentGroupMember()
+                    .apply { groupId = 99L; userId = 1L }),
+            )
+            whenever(gitlabUserService.findAll()).thenReturn(
+                listOf(com.nelos.parallel.gitlab.entity.GitlabUser()
+                    .apply { userId = 1L; gitLabName = "alice" }),
+            )
+            whenever(gitLabApiClient.getProjectForks("course/lab1")).thenReturn(emptyList())
+            whenever(gitLabApiClient.forkProject("course/lab1", "alice")).thenReturn(gitlabProject("alice"))
+
+            service.createForks(CreateForksRequest(assignmentId = 1L, groupId = 99L))
+
+            verify(memberService).findByGroupId(99L)
+        }
+
+        @Test
+        fun `createForks errors when assignment has no GitLab project path`() {
+            whenever(assignmentService.findById(1L)).thenReturn(
+                assignment().apply { gitlabProjectPath = null },
+            )
+
+            assertThrows<IllegalStateException> {
+                service.createForks(CreateForksRequest(assignmentId = 1L, usernames = listOf("a")))
+            }
+        }
+    }
+
+    // --- getGroupsWithForkStatus -----------------------------------------
+
+    @Nested
+    inner class GetGroupsWithForkStatus {
+
+        @Test
+        fun `marks each member as hasFork or unavailable depending on registry state`() {
+            // Three students: alice has a fork, bob has a gitlab account but no
+            // fork yet, charlie isn't even on gitlab (typo in profile?).
+            whenever(assignmentService.findById(1L)).thenReturn(assignment())
+            whenever(gitLabApiClient.getProjectForks("course/lab1")).thenReturn(
+                listOf(gitlabProject("alice")),
+            )
+            whenever(gitLabApiClient.listUsers()).thenReturn(
+                listOf(
+                    com.nelos.parallel.gitlab.client.vo.GitLabUserInfo(username = "alice"),
+                    com.nelos.parallel.gitlab.client.vo.GitLabUserInfo(username = "bob"),
+                ),
+            )
+            val userA = com.nelos.parallel.auth.entity.User().apply { id = 1L; displayName = "Alice A." }
+            val userB = com.nelos.parallel.auth.entity.User().apply { id = 2L; displayName = "Bob B." }
+            val userC = com.nelos.parallel.auth.entity.User().apply { id = 3L; displayName = "Charlie C." }
+            whenever(userService.findAll()).thenReturn(listOf(userA, userB, userC))
+            whenever(gitlabUserService.findAll()).thenReturn(
+                listOf(
+                    com.nelos.parallel.gitlab.entity.GitlabUser().apply { userId = 1L; gitLabName = "alice" },
+                    com.nelos.parallel.gitlab.entity.GitlabUser().apply { userId = 2L; gitLabName = "bob" },
+                    com.nelos.parallel.gitlab.entity.GitlabUser().apply { userId = 3L; gitLabName = "charlie-typo" },
+                ),
+            )
+            val group = com.nelos.parallel.pipeline.data.entity.StudentGroup().apply {
+                id = 10L; name = "Group A"
+            }
+            whenever(groupService.findAll()).thenReturn(listOf(group))
+            whenever(memberService.findByGroupId(10L)).thenReturn(
+                listOf(
+                    com.nelos.parallel.pipeline.data.entity.StudentGroupMember()
+                        .apply { groupId = 10L; userId = 1L },
+                    com.nelos.parallel.pipeline.data.entity.StudentGroupMember()
+                        .apply { groupId = 10L; userId = 2L },
+                    com.nelos.parallel.pipeline.data.entity.StudentGroupMember()
+                        .apply { groupId = 10L; userId = 3L },
+                ),
+            )
+
+            val statuses = service.getGroupsWithForkStatus(1L)
+
+            assertEquals(1, statuses.size)
+            val g = statuses.single()
+            assertEquals(3, g.memberCount)
+            assertEquals(1, g.missingForkCount)    // bob: on gitlab, no fork
+            assertEquals(1, g.unavailableCount)    // charlie: not on gitlab
+            val byName = (g.members ?: error("members")).associateBy { it.username }
+            assertEquals(true, byName["alice"]?.hasFork)
+            assertEquals(true, byName["bob"]?.gitlabExists)
+            assertEquals(false, byName["bob"]?.hasFork)
+            assertEquals(false, byName["charlie-typo"]?.gitlabExists)
+        }
+
+        @Test
+        fun `member without a gitlab name maps to empty username and unavailable`() {
+            // A user added to a group before their gitlab profile is set up -
+            // the row still appears, but every status flag points to "not yet
+            // ready". Forking would skip them.
+            whenever(assignmentService.findById(1L)).thenReturn(assignment())
+            whenever(gitLabApiClient.getProjectForks("course/lab1")).thenReturn(emptyList())
+            whenever(gitLabApiClient.listUsers()).thenReturn(emptyList())
+            whenever(userService.findAll()).thenReturn(
+                listOf(com.nelos.parallel.auth.entity.User().apply { id = 1L; displayName = "X" }),
+            )
+            whenever(gitlabUserService.findAll()).thenReturn(emptyList())
+            whenever(groupService.findAll()).thenReturn(
+                listOf(com.nelos.parallel.pipeline.data.entity.StudentGroup()
+                    .apply { id = 10L; name = "G" }),
+            )
+            whenever(memberService.findByGroupId(10L)).thenReturn(
+                listOf(com.nelos.parallel.pipeline.data.entity.StudentGroupMember()
+                    .apply { groupId = 10L; userId = 1L }),
+            )
+
+            val view = service.getGroupsWithForkStatus(1L).single()
+
+            assertEquals("", view.members?.single()?.username)
+            assertEquals(false, view.members?.single()?.gitlabExists)
+        }
+
+        @Test
+        fun `errors when assignment has no GitLab project path`() {
+            whenever(assignmentService.findById(1L)).thenReturn(
+                assignment().apply { gitlabProjectPath = null },
+            )
+            assertThrows<IllegalStateException> { service.getGroupsWithForkStatus(1L) }
+        }
+    }
+
+    // --- getExistingForks --------------------------------------------------
+
+    @Test
+    fun `getExistingForks filters out marked-for-deletion forks`() {
+        whenever(assignmentService.findById(1L)).thenReturn(assignment())
+        whenever(gitLabApiClient.getProjectForks("course/lab1")).thenReturn(
+            listOf(
+                gitlabProject("alive"),
+                gitlabProject("doomed", deleted = "2026-01-01"),
+            ),
+        )
+
+        val forks = service.getExistingForks(1L)
+
+        assertEquals(listOf("alive/lab1"), forks.map { it.pathWithNamespace })
+    }
+
+    @Test
+    fun `getExistingForks errors when assignment has no GitLab project path`() {
+        whenever(assignmentService.findById(1L)).thenReturn(
+            assignment().apply { gitlabProjectPath = null },
+        )
+        assertThrows<IllegalStateException> { service.getExistingForks(1L) }
     }
 }

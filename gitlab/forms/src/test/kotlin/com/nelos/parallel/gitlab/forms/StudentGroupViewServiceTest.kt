@@ -203,4 +203,54 @@ class StudentGroupViewServiceTest {
             verify(memberService, never()).save(any<StudentGroupMember>())
         }
     }
+
+    // --- getGroups / getGroup / deleteGroup --------------------------------
+
+    @Test
+    fun `getGroups joins members with the user+gitlab context exactly once per call`() {
+        // Loading the user+gitlab maps is the costly part; doing it per group
+        // would be N+1. The service builds context once.
+        whenever(userService.findAll()).thenReturn(
+            listOf(user(11L, "alice", "Alice")),
+        )
+        whenever(gitlabUserService.findAll()).thenReturn(
+            listOf(com.nelos.parallel.gitlab.entity.GitlabUser()
+                .apply { userId = 11L; gitLabName = "alice-gl" }),
+        )
+        whenever(groupService.findAll()).thenReturn(listOf(group(5L)))
+        whenever(memberService.findByGroupId(5L)).thenReturn(
+            listOf(StudentGroupMember().apply { groupId = 5L; userId = 11L }),
+        )
+
+        val list = service.getGroups()
+
+        assertEquals(1, list.size)
+        val g = list.single()
+        assertEquals(5L, g.id)
+        assertEquals(1, g.memberCount)
+        assertEquals("alice", g.members?.single()?.login)
+        assertEquals("alice-gl", g.members?.single()?.gitlabName)
+        // Maps loaded exactly once - guards N+1.
+        verify(userService).findAll()
+        verify(gitlabUserService).findAll()
+    }
+
+    @Test
+    fun `getGroup loads members for the single requested id`() {
+        whenever(userService.findAll()).thenReturn(emptyList())
+        whenever(gitlabUserService.findAll()).thenReturn(emptyList())
+        whenever(groupService.findById(5L)).thenReturn(group(5L, name = "Lab A"))
+        whenever(memberService.findByGroupId(5L)).thenReturn(emptyList())
+
+        val view = service.getGroup(5L)
+
+        assertEquals("Lab A", view.name)
+        assertEquals(0, view.memberCount)
+    }
+
+    @Test
+    fun `deleteGroup forwards to the persistence service`() {
+        service.deleteGroup(5L)
+        verify(groupService).remove(5L)
+    }
 }

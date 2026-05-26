@@ -51,7 +51,8 @@ fun scenarioResult(
     name: String = "Sum",
     tests: List<TestEntry> = listOf(testEntry()),
     metrics: ScenarioMetrics? = null,
-) = ScenarioResult(name = name, tests = tests, metrics = metrics)
+    summary: TestSummary? = null,
+) = ScenarioResult(name = name, tests = tests, metrics = metrics, summary = summary)
 
 fun testEntry(name: String = "sum.basic", runs: List<TestRun> = listOf(testRun())) =
     TestEntry(name = name, runs = runs)
@@ -92,21 +93,26 @@ fun testSummary(
     failedByCorrectness: Int? = null,
     maxTimeMs: Double? = null,
     maxRssKb: Long? = null,
+    maxCgMemPeakKb: Long? = null,
+    totalCpuTimeSec: Double? = null,
     scalability: List<ScalabilityPoint>? = null,
 ) = TestSummary(
     totalTests = totalTests, passed = passed, failed = failed,
     failedByTimeout = failedByTimeout, failedByOom = failedByOom,
     failedByCrash = failedByCrash, failedByCorrectness = failedByCorrectness,
     maxTimeMs = maxTimeMs, maxRssKb = maxRssKb,
+    maxCgMemPeakKb = maxCgMemPeakKb, totalCpuTimeSec = totalCpuTimeSec,
     scalability = scalability,
 )
 
 fun scalability(
     threads: Int, totalTimeMs: Double = 100.0, speedup: Double = 2.0,
     efficiency: Double = 0.5, maxRssKb: Long = 1024L, totalCpuTimeSec: Double = 0.5,
+    testsCompared: Int? = null, testsSkipped: Int? = null,
 ) = ScalabilityPoint(
     threads = threads, totalTimeMs = totalTimeMs, speedup = speedup,
     efficiency = efficiency, maxRssKb = maxRssKb, totalCpuTimeSec = totalCpuTimeSec,
+    testsCompared = testsCompared, testsSkipped = testsSkipped,
 )
 
 fun progressEvent(

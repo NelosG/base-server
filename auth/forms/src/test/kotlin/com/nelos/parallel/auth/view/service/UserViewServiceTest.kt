@@ -24,7 +24,8 @@ class UserViewServiceTest {
 
     private val userDetailsService: UserDetailsProviderService = mock()
     private val userService: UserService = mock()
-    private val service = UserViewService(userDetailsService, userService)
+    private val applicationContext: org.springframework.context.ApplicationContext = mock()
+    private val service = UserViewService(userDetailsService, userService, applicationContext)
 
     private val bcrypt = BCryptPasswordEncoder()
 
@@ -66,14 +67,29 @@ class UserViewServiceTest {
 
         private val currentHash = bcrypt.encode("oldPass1234")
 
-        private fun stubLookup() {
+        private fun stubEstablishedUser() {
             whenever(userDetailsService.loadUserByUsername("alice"))
                 .thenReturn(UserData(1L, "alice", currentHash, UserType.USER))
+            whenever(userService.findByLogin("alice")).thenReturn(
+                User().apply {
+                    id = 1L; login = "alice"
+                    properties = UserProperties(passwordChangeRequired = false)
+                },
+            )
+        }
+
+        private fun stubOtpUser() {
+            whenever(userService.findByLogin("alice")).thenReturn(
+                User().apply {
+                    id = 1L; login = "alice"
+                    properties = UserProperties(passwordChangeRequired = true, initialPassword = "raw-otp")
+                },
+            )
         }
 
         @Test
         fun `delegates to UserDetailsProviderService on a valid change`() {
-            stubLookup()
+            stubEstablishedUser()
 
             service.changePassword(
                 ChangePasswordData(currentPassword = "oldPass1234", newPassword = "newPass5678"),
@@ -83,7 +99,9 @@ class UserViewServiceTest {
         }
 
         @Test
-        fun `rejects missing currentPassword`() {
+        fun `rejects missing currentPassword for an established user`() {
+            stubEstablishedUser()
+
             val ex = assertThrows<IllegalStateException> {
                 service.changePassword(ChangePasswordData(currentPassword = null, newPassword = "newPass5678"))
             }
@@ -119,7 +137,7 @@ class UserViewServiceTest {
 
         @Test
         fun `rejects when currentPassword does not match the stored hash`() {
-            stubLookup()
+            stubEstablishedUser()
 
             val ex = assertThrows<IllegalStateException> {
                 service.changePassword(
@@ -128,6 +146,29 @@ class UserViewServiceTest {
             }
             assertTrue(ex.message?.contains("Current password is incorrect") == true)
             verify(userDetailsService, never()).changePassword(any(), any())
+        }
+
+        @Test
+        fun `OTP user can change password without supplying currentPassword`() {
+            stubOtpUser()
+
+            service.changePassword(ChangePasswordData(currentPassword = null, newPassword = "newPass5678"))
+
+            verify(userDetailsService).changePassword(eq("alice"), eq("newPass5678"))
+            // No BCrypt lookup needed - we never had to consult the stored hash.
+            verify(userDetailsService, never()).loadUserByUsername(any())
+        }
+
+        @Test
+        fun `OTP user's currentPassword field is ignored entirely`() {
+            stubOtpUser()
+
+            // Even with a wrong currentPassword the OTP user goes through.
+            service.changePassword(
+                ChangePasswordData(currentPassword = "anything-goes", newPassword = "newPass5678"),
+            )
+
+            verify(userDetailsService).changePassword(eq("alice"), eq("newPass5678"))
         }
     }
 

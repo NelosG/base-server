@@ -7,21 +7,21 @@ import com.nelos.parallel.pipeline.commons.enums.SubmissionStatus
 import com.nelos.parallel.pipeline.commons.service.EvaluationContext
 import com.nelos.parallel.pipeline.commons.service.EvaluatorScript
 import com.nelos.parallel.pipeline.commons.service.SubmissionVerdict
-import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import javax.script.ScriptEngineManager
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 
 /**
- * Real-engine smoke tests for [KtsVerdictExtension]. We deliberately keep
- * the script sources tiny: the JSR-223 Kotlin compiler is slow on first
- * use, and longer scripts compound that cost without buying us extra
- * coverage of the wiring under test.
+ * Real-engine smoke tests for [KtsVerdictExtension]. We use a single shared
+ * extension instance (PER_CLASS) so the multi-second compiler warm-up is
+ * paid once rather than per test. Long-form integration of scripts living
+ * in [com.nelos.parallel.pipeline.kts.api.JudgeApi] is now reliable thanks
+ * to scripting-jvm-host - the legacy JSR-223 engine could only get to the
+ * fallback paths here.
  *
  * @author gpushkarev
  * @since %CURRENT_VERSION%
@@ -44,12 +44,12 @@ class KtsVerdictExtensionTest {
         )
 
     @BeforeAll
-    fun ensureKtsAvailable() {
-        // Avoid failing on environments where kotlin-scripting-jsr223 was
-        // somehow excluded - the production code falls back to baseline in
-        // that case, but the tests below assert the success path.
-        val engine = ScriptEngineManager().getEngineByExtension("kts")
-        assumeTrue(engine != null, "Kotlin JSR-223 engine unavailable; skipping real-script tests")
+    fun warmUpCompiler() {
+        // Pay the embedded-compiler boot cost once; later tests use the cache.
+        extension.apply(
+            ctx(EvaluatorScript(type = ScriptType.KTS, source = "null", timeoutMs = 60_000)),
+            baseline,
+        )
     }
 
     // --- passthrough paths (do not touch the engine) --------------------
@@ -70,15 +70,59 @@ class KtsVerdictExtensionTest {
         assertSame(baseline, result)
     }
 
-    // --- real engine - only the "script blew up" branch is practical here --
-    //
-    // The wiring path that calls into `judge { pass() }` / `fail()` works in
-    // production but requires the embedded Kotlin compiler to resolve our
-    // `JudgeApi` helpers - that takes several seconds per invocation and is
-    // sensitive to test-classpath classloader nuances that don't matter to
-    // the orchestrator at runtime. Those branches are exercised end-to-end
-    // by manual instructor scripts; here we focus on the fast unit-level
-    // wiring + the fallback paths.
+    // --- engine paths ---------------------------------------------------
+
+    @Test
+    fun `script returning pass yields a COMPLETED verdict`() {
+        val src = """pass(summary = "perfect", reason = "ok")"""
+        val kts = EvaluatorScript(type = ScriptType.KTS, source = src, timeoutMs = 60_000)
+
+        val result = extension.apply(ctx(kts), baseline)
+
+        assertEquals(SubmissionStatus.COMPLETED, result.submissionStatus)
+        assertEquals(JobStatus.SUCCESS, result.jobStatus)
+        assertEquals("perfect", result.summary)
+        assertEquals("ok", result.reason)
+    }
+
+    @Test
+    fun `script returning fail yields a FAILED verdict`() {
+        val src = """fail(reason = "perf below threshold")"""
+        val kts = EvaluatorScript(type = ScriptType.KTS, source = src, timeoutMs = 60_000)
+
+        val result = extension.apply(ctx(kts), baseline)
+
+        assertEquals(SubmissionStatus.FAILED, result.submissionStatus)
+        assertEquals(JobStatus.FAILED, result.jobStatus)
+        assertEquals("baseline-summary", result.summary)
+        assertEquals("perf below threshold", result.reason)
+    }
+
+    @Test
+    fun `script can read ctx and call followBaseline`() {
+        val src = """
+            if (ctx.result.status == "completed") ctx.followBaseline("looked ok")
+            else fail("status wasn't completed")
+        """.trimIndent()
+        val kts = EvaluatorScript(type = ScriptType.KTS, source = src, timeoutMs = 60_000)
+
+        val result = extension.apply(ctx(kts), baseline)
+
+        assertEquals(SubmissionStatus.COMPLETED, result.submissionStatus)
+        assertEquals("baseline-summary", result.summary)
+        assertEquals("looked ok", result.reason)
+    }
+
+    @Test
+    fun `script returning Unit falls back to baseline with reason`() {
+        val src = """val x = 42"""
+        val kts = EvaluatorScript(type = ScriptType.KTS, source = src, timeoutMs = 60_000)
+
+        val result = extension.apply(ctx(kts), baseline)
+
+        assertEquals(SubmissionStatus.COMPLETED, result.submissionStatus)
+        assertContains(result.reason ?: "", "no verdict")
+    }
 
     @Test
     fun `script that fails to compile falls back to baseline with reason`() {
@@ -87,13 +131,21 @@ class KtsVerdictExtensionTest {
 
         val result = extension.apply(ctx(kts), baseline)
 
-        // Baseline status preserved; reason explains the fallback.
         assertEquals(SubmissionStatus.COMPLETED, result.submissionStatus)
         assertEquals(JobStatus.SUCCESS, result.jobStatus)
         assertNotNull(result.reason)
-        // We don't assert the exact wording because Kotlin's diagnostic text
-        // changes between versions - but the reason MUST end with our
-        // "used baseline" tail so the UI can tell this was a fallback.
+        assertContains(result.reason ?: "", "used baseline")
+    }
+
+    @Test
+    fun `script that throws falls back to baseline with reason`() {
+        val src = """error("kaboom")"""
+        val kts = EvaluatorScript(type = ScriptType.KTS, source = src, timeoutMs = 60_000)
+
+        val result = extension.apply(ctx(kts), baseline)
+
+        assertEquals(SubmissionStatus.COMPLETED, result.submissionStatus)
+        assertContains(result.reason ?: "", "kaboom")
         assertContains(result.reason ?: "", "used baseline")
     }
 }

@@ -6,6 +6,7 @@ import com.nelos.parallel.commons.adapter.vo.response.TaskResult
 import com.nelos.parallel.jobs.enums.JobStatus
 import com.nelos.parallel.pipeline.commons.enums.ScriptType
 import com.nelos.parallel.pipeline.commons.enums.SubmissionStatus
+import com.nelos.parallel.pipeline.commons.extension.JudgeResult
 import com.nelos.parallel.pipeline.commons.service.EvaluationContext
 import com.nelos.parallel.pipeline.commons.service.EvaluatorScript
 import com.nelos.parallel.pipeline.commons.service.SubmissionVerdict
@@ -16,7 +17,10 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 /**
  * Unit-level tests for [PythonVerdictExtension] cover everything that runs
@@ -58,6 +62,32 @@ class PythonVerdictExtensionTest {
         val result = ext.apply(ctx(kts), baseline)
 
         assertSame(baseline, result)
+    }
+
+    @Test
+    fun `JudgeResult JSON from a script deserialises via a plain ObjectMapper`() {
+        // Guards against the regression where JudgeResult had no @JsonCreator
+        // and Jackson failed with "no Creators, like default constructor".
+        val mapper = ObjectMapper()
+        val json = """{"pass": true, "summary": "all good", "reason": null}"""
+
+        val verdict = mapper.readValue(json, JudgeResult::class.java)
+
+        assertTrue(verdict.pass)
+        assertEquals("all good", verdict.summary)
+        assertNull(verdict.reason)
+    }
+
+    @Test
+    fun `JudgeResult deserialises with only the required pass field`() {
+        val mapper = ObjectMapper()
+        val json = """{"pass": false}"""
+
+        val verdict = mapper.readValue(json, JudgeResult::class.java)
+
+        assertFalse(verdict.pass)
+        assertNull(verdict.summary)
+        assertNull(verdict.reason)
     }
 
     @Test

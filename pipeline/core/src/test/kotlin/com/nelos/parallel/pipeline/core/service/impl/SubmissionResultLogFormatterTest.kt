@@ -521,12 +521,123 @@ class SubmissionResultLogFormatterTest {
             )
 
             assertContains(logs, "  Scalability:")
-            assertTrue(logs.any { it.contains("Threads") && it.contains("Speedup") && it.contains("Efficiency") })
+            assertTrue(
+                logs.any {
+                    it.contains("Threads") && it.contains("Speedup") &&
+                            it.contains("Efficiency") && it.contains("Tests")
+                },
+            )
             val firstRow = logs.first { it.trim().startsWith("1 |") }
             assertContains(firstRow, "100ms")
             assertContains(firstRow, "1.00x")
             assertContains(firstRow, "100%")
             assertContains(firstRow, "1MB")
+            // testsCompared / testsSkipped not provided -> "-"
+            assertTrue(firstRow.trimEnd().endsWith("-"), "missing gating info should render as dash: $firstRow")
+        }
+
+        @Test
+        fun `scalability tests column shows passed-vs-total when engine reports gating`() {
+            val logs = render(
+                taskResult(
+                    summary = ResultSummary(
+                        performance = testSummary(
+                            scalability = listOf(
+                                scalability(threads = 1, testsCompared = 5, testsSkipped = 0),
+                                scalability(threads = 4, testsCompared = 3, testsSkipped = 2),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+
+            val rows = logs.filter { it.trim().startsWith("1 |") || it.trim().startsWith("4 |") }
+            assertEquals(2, rows.size)
+            assertTrue(rows[0].trimEnd().endsWith("5/5"), "1-thread row tail: ${rows[0]}")
+            assertTrue(rows[1].trimEnd().endsWith("3/5"), "4-thread row tail: ${rows[1]}")
+        }
+
+        @Test
+        fun `summary section is skipped when scalability list is empty`() {
+            val logs = render(
+                taskResult(
+                    summary = ResultSummary(
+                        performance = testSummary(totalTests = 0, scalability = emptyList()),
+                    ),
+                ),
+            )
+
+            assertFalse(logs.any { it.contains("Scalability:") }, "empty scalability must not render header")
+        }
+    }
+
+    // --- per-scenario summary (engine sends scenario.summary now) --------
+
+    @Nested
+    inner class PerScenarioSummary {
+
+        @Test
+        fun `scenario summary section renders after its tests`() {
+            val logs = render(
+                taskResult(
+                    performance = listOf(
+                        scenarioResult(
+                            name = "VecAdd",
+                            tests = listOf(testEntry("vec.tiny")),
+                            summary = testSummary(
+                                totalTests = 4, passed = 4, failed = 0,
+                                maxTimeMs = 50.0, maxRssKb = 3072L,
+                            ),
+                        ),
+                    ),
+                ),
+            )
+
+            val scenarioIdx = logs.indexOfFirst { it.contains("--- Performance: VecAdd ---") }
+            val testIdx = logs.indexOfFirst { it.contains("✓ vec.tiny") }
+            val summaryIdx = logs.indexOfFirst { it.contains("--- Performance: VecAdd Summary ---") }
+            assertTrue(scenarioIdx >= 0 && testIdx > scenarioIdx && summaryIdx > testIdx)
+            assertContains(logs, "  Tests: 4/4 passed, 0 failed")
+            assertContains(logs, "  Max time: 50ms")
+            assertContains(logs, "  Peak RSS: 3MB")
+        }
+
+        @Test
+        fun `scenario summary carries its own scalability table`() {
+            val logs = render(
+                taskResult(
+                    performance = listOf(
+                        scenarioResult(
+                            name = "PerfA",
+                            summary = testSummary(
+                                scalability = listOf(
+                                    scalability(threads = 1, totalTimeMs = 200.0, speedup = 1.0,
+                                        efficiency = 1.0, maxRssKb = 1024L, testsCompared = 2, testsSkipped = 0),
+                                    scalability(threads = 8, totalTimeMs = 30.0, speedup = 6.66,
+                                        efficiency = 0.83, maxRssKb = 4096L, testsCompared = 2, testsSkipped = 0),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+
+            val summaryIdx = logs.indexOfFirst { it.contains("--- Performance: PerfA Summary ---") }
+            assertTrue(summaryIdx > 0)
+            val tail = logs.drop(summaryIdx)
+            assertTrue(tail.any { it.contains("Scalability:") })
+            assertTrue(tail.any { it.trim().startsWith("8 |") && it.contains("6.66x") })
+        }
+
+        @Test
+        fun `scenario without summary leaves no Summary header`() {
+            val logs = render(
+                taskResult(
+                    correctness = listOf(scenarioResult(name = "Quiet")),
+                ),
+            )
+
+            assertFalse(logs.any { it.contains("Quiet Summary") })
         }
     }
 

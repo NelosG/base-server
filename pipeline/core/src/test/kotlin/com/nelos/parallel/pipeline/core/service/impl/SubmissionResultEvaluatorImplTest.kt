@@ -151,6 +151,29 @@ class SubmissionResultEvaluatorImplTest {
         }
 
         @Test
+        fun `summary status reflects the verdict not the raw engine status`() {
+            val evaluator = SubmissionResultEvaluatorImpl(extensions = emptyList())
+
+            // Engine: completed; tests: some perf failed -> verdict is FAILED.
+            // The leading "Status:" must show "failed", not "completed".
+            val v = evaluator.evaluate(
+                ctx(status = "completed", performancePassed = 2, performanceFailed = 2),
+            )
+
+            assertEquals(SubmissionStatus.FAILED, v.submissionStatus)
+            assertContains(v.summary, "Status: failed")
+        }
+
+        @Test
+        fun `cancelled engine status shows as rejected in summary`() {
+            val evaluator = SubmissionResultEvaluatorImpl(extensions = emptyList())
+
+            val v = evaluator.evaluate(ctx(status = "cancelled"))
+
+            assertContains(v.summary, "Status: rejected")
+        }
+
+        @Test
         fun `summary includes error when engine reports one`() {
             val evaluator = SubmissionResultEvaluatorImpl(extensions = emptyList())
 

@@ -1,17 +1,17 @@
 package com.nelos.parallel.pipeline.core.service.impl
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.nelos.parallel.commons.adapter.NodeAdapter
-import com.nelos.parallel.commons.adapter.enums.TransportType
-import com.nelos.parallel.commons.adapter.vo.NodeInfo
 import com.nelos.parallel.commons.adapter.vo.request.ProgressEvent
-import com.nelos.parallel.commons.adapter.vo.request.TaskSubmission
 import com.nelos.parallel.commons.adapter.vo.response.TaskResult
-import com.nelos.parallel.commons.adapter.vo.response.TaskSubmissionResponse
+import com.nelos.parallel.pipeline.runner.exception.NoRunnerAvailableException
+import com.nelos.parallel.pipeline.runner.service.RunHandle
+import com.nelos.parallel.pipeline.runner.service.RunnerContext
+import com.nelos.parallel.pipeline.runner.service.RunnerManager
 import com.nelos.parallel.jobs.entity.Job
 import com.nelos.parallel.jobs.enums.JobStatus
 import com.nelos.parallel.jobs.service.JobService
 import com.nelos.parallel.pipeline.commons.enums.SubmissionStatus
+import com.nelos.parallel.pipeline.commons.event.SubmissionTerminalEvent
 import com.nelos.parallel.pipeline.commons.service.*
 import com.nelos.parallel.pipeline.commons.vo.PipelineSubmitRequest
 import com.nelos.parallel.pipeline.data.entity.Assignment
@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.*
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.SimpleTransactionStatus
 import kotlin.test.assertEquals
@@ -48,13 +49,14 @@ class PipelineServiceImplTest {
     private val submissionLogger: SubmissionLogger = mock()
     private val jobService: JobService = mock()
     private val studentResolver: StudentResolver = mock()
-    private val runnerSelector: RunnerSelector = mock()
+    private val runnerManager: RunnerManager = mock()
     private val resultEvaluator: SubmissionResultEvaluator = mock()
     private val resultLogFormatter = SubmissionResultLogFormatter()
     private val objectMapper = ObjectMapper()
     private val txManager: PlatformTransactionManager = mock {
         on { getTransaction(any()) } doReturn SimpleTransactionStatus()
     }
+    private val applicationEventPublisher: ApplicationEventPublisher = mock()
 
     private lateinit var pipeline: PipelineServiceImpl
 
@@ -63,9 +65,17 @@ class PipelineServiceImplTest {
         pipeline = PipelineServiceImpl(
             assignmentService, submissionService, submissionResultService,
             submissionLogService, submissionLogger, jobService,
-            studentResolver, runnerSelector, resultEvaluator, resultLogFormatter,
-            objectMapper, "gitlab-token", "http://server", txManager,
+            studentResolver, runnerManager, resultEvaluator, resultLogFormatter,
+            objectMapper, "gitlab-token", "http://server",
+            applicationEventPublisher, txManager,
         )
+        // Production wires `self` via `@Autowired @Lazy`. In a plain unit test
+        // we set it to the same instance so `self::handleResult` references
+        // a real method (callers don't actually invoke it in submit() tests,
+        // but the field has to be assigned before use).
+        val selfField = PipelineServiceImpl::class.java.getDeclaredField("self")
+        selfField.isAccessible = true
+        selfField.set(pipeline, pipeline)
     }
 
     // --- builders ------------------------------------------------------
@@ -120,16 +130,11 @@ class PipelineServiceImplTest {
         return savedSub
     }
 
-    private fun runner(): SelectedRunner {
-        val node = NodeInfo(nodeId = "n1", transports = emptyList())
-        val adapter: NodeAdapter = mock {
-            on { transportType } doReturn TransportType.HTTP
-            on { submitTask(any(), any<TaskSubmission>()) } doReturn TaskSubmissionResponse(
-                jobId = "500",
-                status = "accepted"
-            )
-        }
-        return SelectedRunner(node = node, adapter = adapter, transport = TransportType.HTTP)
+    /** Mock RunHandle - the manager hands one back to PipelineService on a successful dispatch. */
+    private fun handle(runnerName: String = "http", jobId: String = "500"): RunHandle = object : RunHandle {
+        override val runnerName: String = runnerName
+        override val jobId: String = jobId
+        override fun cancel() = Unit
     }
 
     // --- input validation ----------------------------------------------
@@ -170,7 +175,7 @@ class PipelineServiceImplTest {
         @Test
         fun `blank username falls back to namespace extracted from sourceRepoUrl`() {
             setupHappyPath()
-            val r = runner(); whenever(runnerSelector.selectRunner(any())).thenReturn(r)
+            whenever(runnerManager.dispatch(any<RunnerContext>())).thenReturn(handle())
 
             pipeline.submit(submitRequest(username = "", sourceRepoUrl = "http://gitlab/myuser/lab1.git"))
 
@@ -212,7 +217,7 @@ class PipelineServiceImplTest {
         @Test
         fun `happy path dispatches and returns dispatched status`() {
             setupHappyPath()
-            val r = runner(); whenever(runnerSelector.selectRunner(any())).thenReturn(r)
+            whenever(runnerManager.dispatch(any<RunnerContext>())).thenReturn(handle())
 
             val response = pipeline.submit(submitRequest())
 
@@ -223,7 +228,8 @@ class PipelineServiceImplTest {
         @Test
         fun `no runner triggers failSubmissionTx and returns error`() {
             setupHappyPath()
-            whenever(runnerSelector.selectRunner(any())).thenReturn(null)
+            whenever(runnerManager.dispatch(any<RunnerContext>()))
+                .thenThrow(NoRunnerAvailableException(emptyList()))
 
             val response = pipeline.submit(submitRequest())
 
@@ -238,34 +244,28 @@ class PipelineServiceImplTest {
         }
 
         @Test
-        fun `RPC failure after dispatch leaves submission DISPATCHED and reports dispatched`() {
+        fun `runner that accepts despite a swallowed RPC failure still reports dispatched`() {
+            // HttpTaskRunner / RabbitTaskRunner swallow submitTask exceptions and return a
+            // handle anyway, on the bet that the engine still received the message and will
+            // callback. The pipeline must treat this the same as a clean dispatch.
             setupHappyPath()
-            val r = runner().let {
-                val adapter: NodeAdapter = mock {
-                    on { transportType } doReturn TransportType.HTTP
-                    on { submitTask(any(), any<TaskSubmission>()) } doThrow RuntimeException("amqp timeout")
-                }
-                SelectedRunner(node = it.node, adapter = adapter, transport = TransportType.HTTP)
-            }
-            whenever(runnerSelector.selectRunner(any())).thenReturn(r)
+            whenever(runnerManager.dispatch(any<RunnerContext>())).thenReturn(handle())
 
             val response = pipeline.submit(submitRequest())
 
-            // status is "dispatched" - engine may still callback with a real result.
             assertEquals("dispatched", response.status)
-            // We must NOT have flipped the submission to ERROR.
             val saved = argumentCaptor<Submission>()
             verify(submissionService, atLeastOnce()).save(saved.capture())
             assertTrue(
                 saved.allValues.none { it.status == SubmissionStatus.ERROR },
-                "RPC failure must not flip the submission to ERROR (stuck-cleanup handles it).",
+                "swallowed RPC failure must not flip submission to ERROR (stuck-cleanup handles it).",
             )
         }
 
         @Test
         fun `previous pending submission for the same MR is rejected`() {
             setupHappyPath()
-            val r = runner(); whenever(runnerSelector.selectRunner(any())).thenReturn(r)
+            whenever(runnerManager.dispatch(any<RunnerContext>())).thenReturn(handle())
             val prev = Submission().apply {
                 id = 499L
                 status = SubmissionStatus.PENDING
@@ -413,6 +413,25 @@ class PipelineServiceImplTest {
             verify(submissionResultService).save(captured.capture())
             assertTrue(captured.firstValue.resultJson?.contains("\"status\":\"completed\"") == true)
             assertTrue(captured.firstValue.resultJson?.contains("\"error\":\"synthetic\"") == true)
+        }
+
+        @Test
+        fun `publishes SubmissionTerminalEvent with submissionId and terminal status`() {
+            val s = Submission().apply {
+                id = 1L
+                status = SubmissionStatus.DISPATCHED
+            }
+            whenever(submissionService.tryFindByIdForUpdate(1L)).thenReturn(s)
+            whenever(resultEvaluator.evaluate(any())).thenReturn(
+                SubmissionVerdict(SubmissionStatus.FAILED, JobStatus.FAILED, "two scenarios failed"),
+            )
+
+            pipeline.handleResult(TaskResult(jobId = "1", status = "completed"))
+
+            val captured = argumentCaptor<SubmissionTerminalEvent>()
+            verify(applicationEventPublisher).publishEvent(captured.capture())
+            assertEquals(1L, captured.firstValue.submissionId)
+            assertEquals(SubmissionStatus.FAILED, captured.firstValue.status)
         }
     }
 
